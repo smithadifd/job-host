@@ -236,7 +236,7 @@ log file) and **`LK_STAMP`** (its `YYYY-MM-DD_HHMMSS` stamp).
 ### `serotine.run.v1` telemetry (opt-in)
 
 Per-run heartbeat + token/model usage for the Fleet/Serotine observability wedge
-(foundry `roadmaps/fleet.md` § Schema, fleet telemetry decision). **Purely additive** — a wrapper
+(fleet telemetry design contract § Schema, fleet telemetry decision). **Purely additive** — a wrapper
 that never calls these two functions is completely unaffected; nothing emits
 until a wrapper opts in.
 
@@ -296,7 +296,7 @@ Telemetry env-var contract (all optional; read at emit time):
 | `SEROTINE_USAGE_FALLBACK_DISABLE` | `0` | `1` skips the session-JSONL usage fallback. |
 | `SEROTINE_USAGE_PROJECTS_DIR` | `$HOME/.claude/projects` | Session-JSONL root for the fallback. |
 | `SEROTINE_USAGE_SESSION_ID` | — | Scope the usage scan to one session's transcript (`<projects>/*/<id>.jsonl`) so a concurrent session can't bleed into this job's rollup / model-drift. Unset = whole-tree window walk. Pass the **same** id to `claude -p --session-id`. |
-| `SEROTINE_USAGE_PROVIDER` | — | **Opt-in, non-Claude jobs** (foundry `standards/model-routing.md` § Model-id capture): `codex`\|`gemini`\|`omp`\|`grok-build` selects the matching provider usage adapter. **Precedence: this path is checked FIRST**, before `--usage-json`/`--usage-file` and the window fallback, and it never falls through to either. Unset = byte-identical to today (purely additive). An unrecognized value is a **hard error** (raises) rather than a silent `[]` or a silent Claude-window scan. |
+| `SEROTINE_USAGE_PROVIDER` | — | **Opt-in, non-Claude jobs** (model-routing contract § Model-id capture): `codex`\|`gemini`\|`omp`\|`grok-build` selects the matching provider usage adapter. **Precedence: this path is checked FIRST**, before `--usage-json`/`--usage-file` and the window fallback, and it never falls through to either. Unset = byte-identical to today (purely additive). An unrecognized value is a **hard error** (raises) rather than a silent `[]` or a silent Claude-window scan. |
 | `SEROTINE_USAGE_INPUT` | — | File path holding the `SEROTINE_USAGE_PROVIDER` provider's raw output. **Codex: the session ROLLOUT file** (`$HOME/.codex/sessions/**/*.jsonl`) — the only codex-side input that carries a served model id. Raw `codex exec --json` **STDOUT is NOT valid input**: it never carries a model id and is detected + rejected with a loud, actionable `CodexStdoutWireShapeError` (fix the wiring: point this at the rollout file) rather than silently emitting a model-less usage row. Loud at the helper boundary: invoking `serotine_usage.py` directly fails non-zero with the message; under `lk_emit_run` the wrapper is (by design) never failed by telemetry — the observable symptom of a miswired job is that its usage line is simply not emitted, so run the helper directly to see the error. Gemini: a raw API response JSON body. **Omp: the `omp -p --mode json` event stream** (JSONL — the terminal `agent_end` event carries the whole `messages[]`, one usage entry per distinct `(provider, model)`). **Grok-build: the Grok Build CLI's `--output-format json` result object** (ONE JSON object — its `modelUsage` *keys* are the SERVED model ids, e.g. `grok-4.6-build` for a run that requested `grok-4.6`). For those two a capture of the client's **human-readable TUI transcript is NOT valid input** either: it is detected + rejected with a loud, actionable `TuiOutputWireShapeError` naming the flag to add, with the same "no usage line emitted" symptom under `lk_emit_run`. Required alongside `SEROTINE_USAGE_PROVIDER`; missing/unreadable → `[]` (fail closed). |
 | `SEROTINE_USAGE_REQUEST_MODEL` | — | The wrapper's own pinned canonical model id (`gen_ai.request.model`) for the `SEROTINE_USAGE_PROVIDER` path — legitimate to supply directly (it **is** the pin). Never used as the response id: `gen_ai.response.model` comes only from what the provider itself reports (omitted, never fabricated, when it doesn't say one). Required; missing/blank → `[]`. |
 
@@ -307,7 +307,7 @@ product name is **provisional** — see `telemetry/README.md` § Renaming checkl
 **Python producers:** pure-Python jobs (policy-tuner, project-feed's
 `audit.py`) don't shell out to the bash hook — they vendor/path-import
 [`telemetry/serotine_spool.py`](telemetry/serotine_spool.py), the stdlib-only
-sibling of `lk_emit_run`/`_lk_push_spool` (foundry `roadmaps/fleet-event-v1.md`
+sibling of `lk_emit_run`/`_lk_push_spool` (fleet-event design contract
 § Resolutions 5): `emit_run(...)` appends a byte-compatible `serotine.run.v1`
 line and best-effort pushes; `emit_event(...)` appends one `serotine.event.v1`
 line **append-only** (under a launchd-kit wrapper, the wrapper's terminal
@@ -322,7 +322,7 @@ safety posture: the public functions never raise and never log the token.
 serotine's job pages have always had a **Trace** column and have always shown
 `—` in it, because the server half shipped (`POST /api/v1/ingest/trace`,
 `GET /api/v1/traces/<run-id>`, retention) and the wrapper half never did
-(foundry `roadmaps/serotine-user-review-2026-08.md` finding 13). This closes
+(Serotine user-review finding 13). This closes
 it: on a **failing** run the wrapper uploads the tail of its own `$LOG` as that
 run's trace, so `Exit 74` carries its stderr into the dashboard instead of
 requiring an SSH into the host.
@@ -719,7 +719,7 @@ The `op` service-account token is sourced in this order:
    (`security find-generic-password -s op-service-account-token -w`), exported
    as `OP_SERVICE_ACCOUNT_TOKEN` before calling `op`.
 
-**Distinct op-failure mode.** Per foundry's 1Password secrets decision, "op failed" is a new failure mode
+**Distinct op-failure mode.** Per the 1Password secrets decision, "op failed" is a new failure mode
 that must be distinguishable from a webhook/HTTP failure. When the `op` binary
 is missing, no token is available, or `op read` cannot resolve the reference,
 the notifier prints a message prefixed `discord-notify: 1Password resolution
@@ -747,7 +747,7 @@ forms plus a missing value behave.
 
 ## `notify-owner.sh` — the blocking-ask escalation ping
 
-[`notify-owner.sh`](./notify-owner.sh) is the foundry session-autonomy-recalibration decision's § Escalation channel:
+[`notify-owner.sh`](./notify-owner.sh) is the session-autonomy-recalibration decision's § Escalation channel:
 *"Blocking or time-sensitive items: send the harness push notification, and once
 the owner webhook is provisioned, a Discord ping. Never hold a session
 open waiting."*
@@ -880,7 +880,7 @@ the real notifier or the network.
 ## `continuation.py` + `herald-watch-run.sh` — the continuation transport
 
 The deterministic half of the feedback broker's **park-as-data + resume-on-answer**
-contract (`~/foundry/roadmaps/feedback-broker.md` § 3, RATIFIED 2026-08-30). A
+contract (feedback-broker design contract § 3). A
 session pitches an ask through herald, stamps the parked row, and **closes**.
 When Example taps an option, herald writes an answer envelope into
 `$HOME/.herald/answers/`; this subsystem decides whether that answer may resume the
@@ -1056,7 +1056,7 @@ brief's stage-1 acceptance — there is no live demo to fall back on.
 ## `elicitation.py` — the stage-2 elicitation semantics
 
 Stage 1 decides **whether** a continuation may run. `elicitation.py` decides
-**what** it is (`~/foundry/roadmaps/feedback-broker.md` § 11 stage 2, § 3(D),
+**what** it is (feedback-broker design contract § 11 stage 2, § 3(D),
 § 10 Q3):
 
 - a binding **tap** → the `claude --resume` argv for the branch that option
@@ -1182,7 +1182,7 @@ is. `records.py` is what a completed continuation **leaves behind** — the firs
 writer behind the write scope `continuation.py:51` has declared since stage 1
 ("spec drafts, ticket writes, SoT `QUESTIONS:`/`DECISIONS:` lines") and the
 `ticket-write` verb (`:160`) has allowlisted with nothing behind it.
-`foundry/roadmaps/feedback-broker.md` § 11 stage 3.
+Feedback-broker design contract § 11 stage 3.
 
 Given one completed elicitation it writes four destinations in one step:
 
