@@ -5,7 +5,7 @@
 # Dry-run: DISCORD_NOTIFY_DRY_RUN=1 renders the redacted payload to stderr
 #          without reading secrets or calling 1Password or curl.
 #
-# Example: echo "all clear" | bash discord-notify.sh "Dependabot Sweep" 3066993
+# Example: echo "all clear" | bash discord-notify.sh "Scheduled job" 3066993
 #
 # Title cap: Discord embed titles are capped at 256 chars — a caller (e.g. a
 # director brief) that stuffs a long single arg into TITLE gets a 400 from
@@ -440,7 +440,7 @@ if [[ "$DISCORD_WEBHOOK_URL" == op://* ]]; then
   # No `op` binary is spawned, so nothing probes the 1Password desktop-app
   # container and the macOS "access data from other apps" TCC gate never fires
   # (that gate — attributed to the calling bash — is what hung/killed this
-  # notifier and silently dropped posts; see foundry 1password-connect roadmap).
+  # notifier and silently dropped posts).
   # Python holds the LNP grant, so it reaches the LAN Connect server under launchd.
   # The shared resolver lookup order (launchd-kit/README.md § Where consumers
   # find op-resolve.py) stops at the machine-local mirror here, on purpose:
@@ -502,10 +502,10 @@ if [[ "$DISCORD_WEBHOOK_URL" == op://* ]]; then
   # The bound is 90s, NOT a few seconds: the FIRST op call from a COLD launchd
   # context (op-daemon / Keychain / network cold start) routinely takes 30-60s,
   # so a tight 15s bound spuriously failed jobs whose ONLY op call is this
-  # notifier read — e.g. the weekly sweeps, which never run `op run` to pre-warm
-  # the daemon (observed 2026-07-04: dependabot-sweep + homelab-sweep posts
-  # timed out at 15s while ai-coding-tasks / brief, which DO `op run`, posted
-  # fine). We also retry once: the first attempt warms the daemon, so a retry
+  # notifier read — jobs that never run `op run` do not pre-warm
+  # the daemon. Their posts timed out at 15s while jobs that had already
+  # called `op run` posted successfully.
+  # We also retry once: the first attempt warms the daemon, so a retry
   # after a cold-start timeout resolves in <1s. Worst case on a real outage is
   # ~2x90s before failing — the launcher's EXIT-trap frees the lock either way.
   # OP_READ_TIMEOUT_SECS overrides the 90s bound — for tests only (proving the

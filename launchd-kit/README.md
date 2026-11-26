@@ -296,7 +296,7 @@ Telemetry env-var contract (all optional; read at emit time):
 | `SEROTINE_USAGE_FALLBACK_DISABLE` | `0` | `1` skips the session-JSONL usage fallback. |
 | `SEROTINE_USAGE_PROJECTS_DIR` | `$HOME/.claude/projects` | Session-JSONL root for the fallback. |
 | `SEROTINE_USAGE_SESSION_ID` | — | Scope the usage scan to one session's transcript (`<projects>/*/<id>.jsonl`) so a concurrent session can't bleed into this job's rollup / model-drift. Unset = whole-tree window walk. Pass the **same** id to `claude -p --session-id`. |
-| `SEROTINE_USAGE_PROVIDER` | — | **Opt-in, non-Claude jobs** (model-routing contract § Model-id capture): `codex`\|`gemini`\|`omp`\|`grok-build` selects the matching provider usage adapter. **Precedence: this path is checked FIRST**, before `--usage-json`/`--usage-file` and the window fallback, and it never falls through to either. Unset = byte-identical to today (purely additive). An unrecognized value is a **hard error** (raises) rather than a silent `[]` or a silent Claude-window scan. |
+| `SEROTINE_USAGE_PROVIDER` | — | **Opt-in, non-Claude jobs**: `codex`\|`gemini`\|`omp`\|`grok-build` selects the matching provider usage adapter. **Precedence: this path is checked FIRST**, before `--usage-json`/`--usage-file` and the window fallback, and it never falls through to either. Unset = byte-identical to today (purely additive). An unrecognized value is a **hard error** (raises) rather than a silent `[]` or a silent Claude-window scan. |
 | `SEROTINE_USAGE_INPUT` | — | File path holding the `SEROTINE_USAGE_PROVIDER` provider's raw output. **Codex: the session ROLLOUT file** (`$HOME/.codex/sessions/**/*.jsonl`) — the only codex-side input that carries a served model id. Raw `codex exec --json` **STDOUT is NOT valid input**: it never carries a model id and is detected + rejected with a loud, actionable `CodexStdoutWireShapeError` (fix the wiring: point this at the rollout file) rather than silently emitting a model-less usage row. Loud at the helper boundary: invoking `serotine_usage.py` directly fails non-zero with the message; under `lk_emit_run` the wrapper is (by design) never failed by telemetry — the observable symptom of a miswired job is that its usage line is simply not emitted, so run the helper directly to see the error. Gemini: a raw API response JSON body. **Omp: the `omp -p --mode json` event stream** (JSONL — the terminal `agent_end` event carries the whole `messages[]`, one usage entry per distinct `(provider, model)`). **Grok-build: the Grok Build CLI's `--output-format json` result object** (ONE JSON object — its `modelUsage` *keys* are the SERVED model ids, e.g. `grok-4.6-build` for a run that requested `grok-4.6`). For those two a capture of the client's **human-readable TUI transcript is NOT valid input** either: it is detected + rejected with a loud, actionable `TuiOutputWireShapeError` naming the flag to add, with the same "no usage line emitted" symptom under `lk_emit_run`. Required alongside `SEROTINE_USAGE_PROVIDER`; missing/unreadable → `[]` (fail closed). |
 | `SEROTINE_USAGE_REQUEST_MODEL` | — | The wrapper's own pinned canonical model id (`gen_ai.request.model`) for the `SEROTINE_USAGE_PROVIDER` path — legitimate to supply directly (it **is** the pin). Never used as the response id: `gen_ai.response.model` comes only from what the provider itself reports (omitted, never fabricated, when it doesn't say one). Required; missing/blank → `[]`. |
 
@@ -537,12 +537,12 @@ Shared Discord brand-palette decimals (per [`discord-notify.md`](./discord-notif
 
 ## Copy-paste wrapper example
 
-A weekly sweep that runs a skill headless and posts its summary — the whole
+A weekly job that runs a skill headless and posts its summary — the whole
 boilerplate is now four function calls:
 
 ```bash
 #!/usr/bin/env bash
-# my-sweep-run.sh — invoked by launchd (com.example.my-sweep).
+# Example wrapper — invoked by launchd.
 set -uo pipefail
 
 export TOOL_NAME="my-sweep"
@@ -782,7 +782,7 @@ limit; callers should close the pipe after writing. The whole call has a
 The resolved webhook deliberately **overrides** any ambient
 `DISCORD_WEBHOOK_URL`, and with no source configured the script exits `2`
 rather than falling back to whatever webhook happens to be exported: a blocking
-ping landing in the dependabot-sweep feed is a delivery *failure*, not a
+ping landing in an unrelated job's feed is a delivery *failure*, not a
 delivery.
 
 ### The mention target (`OWNER_DISCORD_ID`)
@@ -913,8 +913,7 @@ ownership, mode and symlink refusal, the same posture herald's own store takes
 (0600 records in 0700 directories). Every directory check hands its still-open
 fd to the file open inside it (`dir_fd=`), so a parent directory swapped for a
 symlink between the two cannot redirect the read — `O_NOFOLLOW` on the leaf
-name alone only refuses a symlinked leaf, not a symlinked parent (closed
-2026-08-30, codex high-effort review).
+name alone only refuses a symlinked leaf, not a symlinked parent.
 
 ### Exit codes (what the wrapper turns into Discord colors)
 
@@ -945,7 +944,7 @@ name alone only refuses a symlinked leaf, not a symlinked parent (closed
   allowed to start (not just at claim time), and a real (`--payload-cmd`)
   payload is capped at the remaining budget via `subprocess.call(timeout=...)`
   — a watcher that wins the CAS a moment before the boundary cannot go on to
-  run, or keep running, past it (closed 2026-08-30, codex high-effort review).
+  run, or keep running, past it.
 
 ### State layout (`$LK_CONTINUATION_DIR`, default `$HOME/.claude/continuations`)
 
@@ -981,8 +980,7 @@ revision — exactly-once is the filesystem's own property:
   consumed is provably the record the argv describes.
 
 A crash after the claim loses that one run (re-mint recovers it) and can never
-double-fire it, which is the elected trade (§ Session #329: *"Consume the
-continuation / write the ticket claim BEFORE spawning"*). `claim-ready` stamps
+double-fire it: the claim is recorded before spawning. `claim-ready` stamps
 `claimedAt`, the claimant's own argv and the kickoff argv it handed out under a
 top-level `claim` key, leaving the `registration` body byte-identical to what
 `ready/` held.
@@ -1022,13 +1020,13 @@ behaves exactly as it did before the exec path existed). A record it refuses
 (SWEEP, CHART/MERGE, expired, malformed) is left in `ready/` unspent, because
 the refusal happens before the claim.
 
-The one scheduled caller of that exec path is the daily wave slot (CQ4):
-`triage-wave-run.sh --wave` mints the Queue, publishes its ROLL kickoff READY
+The scheduled caller of that exec path is the daily queue-generation job:
+`triage-wave-run.sh --wave` creates the queue, publishes its ROLL kickoff READY
 and, as its step 4, runs `loop-chain-run.sh --exec` — inheriting the same
 double gate, so without `LOOP_CHAIN_EXEC=1` the slot stops at READY and its
 log says why. `triage-wave-run.sh --triage-only` is the 4h timer's shape
 (report the bar, never mint — with one exception: on the literal verdict
-`FIRE(priority)`, CQ5's urgent path, both it and the no-flag mode mint the
+`FIRE(priority)`, the urgent path, both it and the no-flag mode mint the
 Priority-labelled ticket(s) alone via `triage_wave.py --write --priority-only`
 and leave the kickoff READY for the serialized runner; the daily slot is never
 involved). The slot's plist is a **template**,
@@ -1077,7 +1075,7 @@ Stage 1 decides **whether** a continuation may run. `elicitation.py` decides
 |---|---|---|
 | 1. The branch declaration | `load_interview` → `Interview \| Refusal`. Its own write-once record beside the registration (widening the merged, security-reviewed registration schema for a field only stage 2 reads is not a trade this row takes). Depth is enforced **structurally** — a follow-up that declares children is refused for *being* a level-3 question. | `interview_unbound`, `interview_malformed`, `interview_symlink`, `interview_mode`, `interviews_dir_mode`, `interview_too_deep`, `interview_too_wide`, `interview_depth_mismatch`, `interview_ask_mismatch`, `verb_not_allowed` |
 | 2. Tap vs text | `classify_response` → `tap \| text \| none`, then `dispatch_once`. **A tap outranks a note** (herald's own first-answer-wins, restated for the resume path). The text adapter provably cannot reach seam 3. | `note_symlink`, `note_malformed`, `note_body_kind`, `note_ask_mismatch`, `note_version`, `note_clock_skew`, `notes_dir_mode`, `identity_not_allowlisted`, `channel_not_allowlisted`, `interaction_id_malformed`, `message_id_mismatch` |
-| 3. The argv builder | `build_resume_argv` → `list[str] \| Refusal` (a pure function: it returns a value, it runs nothing), plus `resume_payload` — the third adapter at stage 1's payload seam, its D9 having reserved the slot. The process runner behind it is injected, and the child is bounded by the lease (`lease_budget`). | `branch_not_declared`, `verb_not_allowed`, `model_forbidden`, `session_id_malformed`, `model_malformed`, `claude_bin_malformed`, `prompt_malformed`, `argv_shape`, `argv_forbidden_flag`, `interview_row_mismatch`, `interview_ask_mismatch`, `lease_lost`, `lease_missing`, `lease_unreadable`, `lease_budget_exhausted` |
+| 3. The argv builder | `build_resume_argv` → `list[str] \| Refusal` (a pure function: it returns a value, it runs nothing), plus `resume_payload` — the third adapter at the payload seam. The process runner behind it is injected, and the child is bounded by the lease (`lease_budget`). | `branch_not_declared`, `verb_not_allowed`, `model_forbidden`, `session_id_malformed`, `model_malformed`, `claude_bin_malformed`, `prompt_malformed`, `argv_shape`, `argv_forbidden_flag`, `interview_row_mismatch`, `interview_ask_mismatch`, `lease_lost`, `lease_missing`, `lease_unreadable`, `lease_budget_exhausted` |
 
 **The invariant the whole file exists to hold:** no byte of Example's free text
 ever reaches an argv. Every word of a resume prompt was declared when the ask
@@ -1416,7 +1414,7 @@ timeout/5xx (one retry), passthrough of non-`op://` values, partial-failure
 abort (child not exec'd), and that failure messages never contain the secret
 value. Run it with `python3 launchd-kit/test-op-resolve.py`.
 
-## `notion-webhook-receiver.py` — the Notion webhook spike (CQ9, INERT)
+## `notion-webhook-receiver.py` — the Notion webhook prototype (INERT)
 
 A stdlib `http.server` receiver that turns an AI Coding Tasks board change
 into a launchd-consumable marker. It verifies `X-Notion-Signature`

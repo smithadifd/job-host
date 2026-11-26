@@ -88,8 +88,8 @@
 #                               a non-zero exit — makes a silent failure visible.
 #   lk_run_chain <name1> <cmd1> [<name2> <cmd2> ...]
 #                               A static, pinned fallback-on-HARD-failure chain
-#                               (foundry standards/model-routing.md:296 carve-
-#                               out — a fixed policy artifact, not a router).
+#                               (a fixed policy artifact, not a router;
+#                               its order changes only through a commit).
 #                               Tries each <cmdN> in order via `bash -c`,
 #                               advancing to the next ONLY when the current one
 #                               hard-fails: non-zero exit, exit 0 with fewer
@@ -115,7 +115,7 @@
 #                               can hang indefinitely under the macOS TCC
 #                               app-data gate. See its own doc comment below.
 #
-#   --- serotine.run.v1 telemetry (opt-in; foundry roadmaps/fleet.md § Schema) ---
+#   --- serotine.run.v1 telemetry (opt-in; schema in telemetry/) ---
 #   lk_enable_run_telemetry     Record the run start and arm an EXIT trap. Call
 #                               once after launchd_kit_init, BEFORE the guards, so
 #                               a slot-guard/lock short-circuit still emits skip and
@@ -167,12 +167,12 @@
 #     SEROTINE_USAGE_SESSION_ID           scope the usage scan to ONE session's transcript
 #                                       (<projects>/*/<session-id>.jsonl) so a concurrent
 #                                       session can't bleed its models/tokens into this job's
-#                                       usage rollup (the model-drift false-positive fix,
-#                                       foundry fleet.md session-#22). Unset = whole-tree
+#                                       usage rollup and cause false model-drift
+#                                       reports. Unset = whole-tree
 #                                       window walk. The wrapper must pass the SAME id to
 #                                       `claude -p --session-id`.
-#     SEROTINE_USAGE_PROVIDER           opt-in, non-Claude jobs only (foundry standards/
-#                                       model-routing.md § Model-id capture):
+#     SEROTINE_USAGE_PROVIDER           opt-in, non-Claude jobs only:
+#                                       explicit provider selection;
 #                                       codex|gemini|omp|grok-build selects the matching
 #                                       provider usage adapter in
 #                                       serotine_usage.py. PRECEDENCE: when set, this path
@@ -276,7 +276,7 @@ lk_on_exit() {
 # the `op` (1Password CLI) binary probes the desktop app's container, which
 # hits a macOS TCC "access data from other apps" gate that BLOCKS under
 # display-sleep — an unattended launchd job then hangs indefinitely with no
-# error, silently missing its whole window (foundry op-tcc-appdata-gate note).
+# error, silently missing its whole window.
 # `op` has no built-in timeout, so every raw `op` call in this kit must be
 # routed through this guard instead of invoked bare.
 #
