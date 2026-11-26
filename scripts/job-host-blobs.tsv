@@ -49,7 +49,7 @@ launchd-kit/telemetry/fixtures/valid/crash-run.jsonl	105da2854292ab42aed43209bcf
 launchd-kit/telemetry/fixtures/valid/heartbeat-only-run.jsonl	1ff5864cb837bc452e0d0c81fe4148528f4c828b
 launchd-kit/telemetry/fixtures/valid/llm-run.jsonl	64ec69dcdfd974515e4f34d40e664bb87cc44469
 launchd-kit/telemetry/fixtures/valid/skip-run.jsonl	1608251f37ac3c4f3443cc7f5710ee886fdcf324
-launchd-kit/telemetry/serotine-run-v1.schema.json	aba9c2863fe7ada7e93deaa94d9591057ec93aa7
+launchd-kit/telemetry/serotine-run-v1.schema.json	2ffdd069ddfd8b27c87d41a2645ad36334342a1a
 launchd-kit/telemetry/serotine_spool.py	eb09e3e784f5693dd4fa6f32b76c2bb9518a8a6f
 launchd-kit/telemetry/serotine_trace.py	61d7631e470a49ae286afafb9a960c6d53be201a
 launchd-kit/telemetry/validate_serotine_run.py	28becc04dff6cadf89708f1ef07ba4a4f2ebc4b8
