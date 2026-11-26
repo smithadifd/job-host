@@ -1,0 +1,1 @@
+{"serotine.schema": "serotine.run.v1", "serotine.run.id": "com.example.status-emitter/2026-07-07_071501-a0c4", "serotine.job.label": "com.example.status-emitter", "host.name": "host-a", "serotine.run.start": "2026-07-07T07:15:01-04:00", "serotine.run.end": "2026-07-07T07:15:04-04:00", "serotine.run.exit_code": 0, "serotine.run.status": "ok", "serotine.run.trigger": "launchd"}

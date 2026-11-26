@@ -1,0 +1,1 @@
+{"serotine.schema": "serotine.run.v1", "serotine.run.id": "com.example.morning-brief/2026-07-07_074501-33be", "serotine.job.label": "com.example.morning-brief", "host.name": "host-a", "serotine.run.start": "2026-07-07T07:45:01-04:00", "serotine.run.end": "2026-07-07T07:46:12-04:00", "serotine.run.exit_code": 74, "serotine.run.status": "fail", "serotine.run.trigger": "launchd"}

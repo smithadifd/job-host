@@ -1,0 +1,36 @@
+name: Commit identity
+
+# PR-only identity gate. The only secret this workflow may read is
+# BLOCKED_COMMIT_IDENTITY (Actions masks it). Unset/empty is a loud
+# warn-and-pass. Drafts still run — identity is independent of review state.
+# No path filter: every pull request is checked. The job runs on the runner
+# named by the repository variable JOB_HOST_CI_RUNNER when it is set, and on the
+# GitHub-hosted ubuntu-latest runner otherwise.
+on:
+  pull_request:
+    # ready_for_review is listed so a draft that is later marked ready still
+    # re-runs this job; GitHub's default types omit that flip.
+    types: [opened, synchronize, reopened, ready_for_review]
+
+permissions:
+  contents: read
+
+jobs:
+  # PR-only: refuse commits whose author/committer identity matches the
+  # repository secret BLOCKED_COMMIT_IDENTITY. fetch-depth 0 so the PR
+  # range is present. Unset/empty secret is a loud warn-and-pass, not a
+  # silent green.
+  commit-identity:
+    name: blocked commit identity
+    runs-on: ${{ fromJSON(vars.JOB_HOST_CI_RUNNER || '["ubuntu-latest"]') }}
+    timeout-minutes: 5
+    steps:
+      - name: Check out the repository
+        uses: actions/checkout@v7
+        with:
+          fetch-depth: 0
+          persist-credentials: false
+      - name: Check commit identities
+        env:
+          BLOCKED_COMMIT_IDENTITY: ${{ secrets.BLOCKED_COMMIT_IDENTITY }}
+        run: bash scripts/ci/check-commit-identity.sh "${{ github.event.pull_request.base.sha }}" "${{ github.event.pull_request.head.sha }}"
