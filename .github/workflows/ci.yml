@@ -1,0 +1,70 @@
+name: ci
+on:
+  push:
+  pull_request:
+    types: [opened, synchronize, reopened, ready_for_review]
+permissions:
+  contents: read
+jobs:
+  suites:
+    runs-on: ${{ fromJSON(vars.JOB_HOST_CI_RUNNER || '["ubuntu-latest"]') }}
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@v7
+        with:
+          persist-credentials: false
+      - uses: actions/setup-python@v7
+        with:
+          python-version: "3.12"
+      - name: Test dependencies
+        run: python3 -m pip install pytest==9.1.1 PyYAML==6.0.3
+      # macOS-only suites, left out of the hosted ubuntu job: test_parity.py requires BSD date;
+      # test_timeout.py assumes no timeout binary in /bin and macOS process-group kill behaviour.
+      - name: Portable job host suites
+        run: python3 -B -m pytest -q -p no:cacheprovider job-host/tests/test_boundary.py job-host/tests/test_lock.py job-host/tests/test_secret_resolution.py job-host/tests/test_split_integrations.py
+      - name: Resolver installer
+        run: python3 -B launchd-kit/test-install-op-resolve.py
+      - name: Secret resolver
+        run: python3 -B launchd-kit/test-op-resolve.py
+      - name: Trace telemetry
+        run: python3 -B launchd-kit/test-serotine-trace.py
+      - name: Usage telemetry
+        run: python3 -B launchd-kit/test-serotine-usage.py
+      - name: Notifier dry run
+        run: python3 -B -m pytest -q -p no:cacheprovider launchd-kit/test_discord_notify_dry_run.py
+      - name: Notifier shell suite
+        run: bash launchd-kit/test-discord-notify.sh
+      - name: Publication gate suites
+        run: python3 -B -m pytest -q -p no:cacheprovider tests
+      - name: Installer syntax
+        run: bash -n install.sh
+      - name: Python syntax
+        run: python3 -B -m compileall -q job-host launchd-kit
+  manifest:
+    runs-on: ${{ fromJSON(vars.JOB_HOST_CI_RUNNER || '["ubuntu-latest"]') }}
+    timeout-minutes: 3
+    steps:
+      - uses: actions/checkout@v7
+        with:
+          persist-credentials: false
+      - run: python3 -B -I scripts/check-job-host-manifest.py
+  no-person:
+    runs-on: ${{ fromJSON(vars.JOB_HOST_CI_RUNNER || '["ubuntu-latest"]') }}
+    timeout-minutes: 5
+    steps:
+      - uses: actions/checkout@v7
+        with:
+          fetch-depth: 0
+          persist-credentials: false
+      - name: Scan the index, historical blobs and paths, commit messages and identities
+        env:
+          NO_PERSON_DENY: ${{ secrets.NO_PERSON_DENY }}
+        run: python3 -B -I scripts/check-no-person.py
+  closure:
+    runs-on: ${{ fromJSON(vars.JOB_HOST_CI_RUNNER || '["ubuntu-latest"]') }}
+    timeout-minutes: 3
+    steps:
+      - uses: actions/checkout@v7
+        with:
+          persist-credentials: false
+      - run: python3 -B -I scripts/check-closure.py

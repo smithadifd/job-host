@@ -1,0 +1,13 @@
+# path	sha256 of lowercased matched reference	reason
+job-host/README.md	ca63ed7e9b351d7cd893e891d7604c8ecfa33425dbb1ac33804d380302fc62e7	verbatim upstream source example, documentation only; installed consumers select the leaf root
+launchd-kit/README.md	28d70ac3f1cd1f9200750c24596e79184090d0e9c7954b9697b584049ad22c74	verbatim upstream documentation and configuration examples, not executable leaf dependencies
+launchd-kit/README.md	c7fd0c05349df713e4582ec12352b3557a3d6c009b7b926119c4fc4aa6c26ec6	verbatim upstream documentation and configuration examples, not executable leaf dependencies
+launchd-kit/README.md	4579bceaf587559ae259cf9f8bfac913a461d798ab544e47ac22d79fc96a4c02	verbatim upstream documentation and configuration examples, not executable leaf dependencies
+launchd-kit/README.md	c14d7b06c195e7aa303c44f0efa089390105998d03f284bdd87d3c962aa8da46	verbatim upstream documentation and configuration examples, not executable leaf dependencies
+launchd-kit/README.md	9862e8d69a5ef8b819dfb0811d1824fbda52fb524e6176bcdc0092c36860a80a	verbatim upstream documentation and configuration examples, not executable leaf dependencies
+launchd-kit/discord-notify.sh	0f029256a318d2ebbe51479b6aa82a7ebc7b79eeedacae8fa78d06c51a353513	portable optional notifier configuration namespace shared with the toolkit; this is configuration, not a toolkit checkout dependency
+launchd-kit/discord-notify.sh	5a77836b14d69a3b84c9263e76b7ceed5b28ffbdef530c2baa2fe7ca086a82e8	portable optional notifier configuration namespace shared with the toolkit; this is configuration, not a toolkit checkout dependency
+launchd-kit/discord-notify.sh	28d70ac3f1cd1f9200750c24596e79184090d0e9c7954b9697b584049ad22c74	portable optional notifier configuration namespace shared with the toolkit; this is configuration, not a toolkit checkout dependency
+launchd-kit/discord-notify.sh	c7fd0c05349df713e4582ec12352b3557a3d6c009b7b926119c4fc4aa6c26ec6	portable optional notifier configuration namespace shared with the toolkit; this is configuration, not a toolkit checkout dependency
+launchd-kit/discord-notify.sh	93daa06e36d11106d59c9b9f45638977bcc138cea5c4cf17236f977a8e05eb32	portable optional notifier configuration namespace shared with the toolkit; this is configuration, not a toolkit checkout dependency
+launchd-kit/telemetry/serotine-run-v1.schema.json	8309ab7dbfd9b3aa25eba9d8c6972c93df1aedcbe8915a3b6bb753a6bff72b91	the schema's $id annotation names the toolkit repository's public GitHub URL (an annotation; serotine validators ignore $id)

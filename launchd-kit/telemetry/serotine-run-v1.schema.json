@@ -1,0 +1,143 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://github.com/smithadifd/claude-toolkit/launchd-kit/telemetry/serotine-run-v1.schema.json",
+  "title": "serotine.run.v1",
+  "description": "One JSON object per completed run, one line, JSONL. Normative source: foundry roadmaps/fleet.md § Schema (serotine.run.v1) + fleet telemetry decision. Keys defined by OTel semconv are used verbatim (gen_ai.* per GenAI semconv, host.name per general resource semconv); everything Serotine-specific is namespaced serotine.*. Every run emits a line, LLM or not — non-LLM jobs omit gen_ai.*/serotine.usage and the line is pure heartbeat.",
+  "type": "object",
+  "properties": {
+    "serotine.schema": {
+      "const": "serotine.run.v1",
+      "description": "Envelope discriminator. A sibling serotine.event.v1 is reserved for Phase-2 trust-gate ledger events."
+    },
+    "serotine.run.id": {
+      "type": "string",
+      "pattern": "^[A-Za-z0-9][A-Za-z0-9._-]*/[0-9]{4}-[0-9]{2}-[0-9]{2}_[0-9]{6}-[0-9a-f]{4}$",
+      "description": "Idempotency key: <label>/<LK_STAMP>-<4 hex>. LK_STAMP is launchd-kit's YYYY-MM-DD_HHMMSS run stamp. Ingest dedupes on it, so spool replay after a failed push is safe."
+    },
+    "serotine.job.label": {
+      "type": "string",
+      "minLength": 1,
+      "description": "launchd job label (or equivalent job identifier on non-launchd hosts)."
+    },
+    "host.name": {
+      "type": "string",
+      "minLength": 1,
+      "description": "OTel general resource semconv attribute, verbatim."
+    },
+    "serotine.run.start": {
+      "type": "string",
+      "pattern": "^[0-9]{4}-[0-9]{2}-[0-9]{2}T[0-9]{2}:[0-9]{2}:[0-9]{2}(\\.[0-9]+)?([+-][0-9]{2}:[0-9]{2}|Z)$",
+      "description": "RFC 3339 timestamp with explicit offset (or Z)."
+    },
+    "serotine.run.end": {
+      "type": "string",
+      "pattern": "^[0-9]{4}-[0-9]{2}-[0-9]{2}T[0-9]{2}:[0-9]{2}:[0-9]{2}(\\.[0-9]+)?([+-][0-9]{2}:[0-9]{2}|Z)$",
+      "description": "RFC 3339 timestamp with explicit offset (or Z)."
+    },
+    "serotine.run.exit_code": {
+      "type": "integer",
+      "minimum": 0,
+      "maximum": 255,
+      "description": "Wrapper exit code; crashed runs still emit (status=fail, real exit code)."
+    },
+    "serotine.run.status": {
+      "enum": ["ok", "fail", "skip"],
+      "description": "skip = slot-guard/lock short-circuit, emitted so 'skipped by design' is distinguishable from 'silently dead'."
+    },
+    "serotine.run.trigger": {
+      "enum": ["launchd", "manual", "kickstart"]
+    },
+    "gen_ai.operation.name": {
+      "type": "string",
+      "minLength": 1,
+      "description": "OTel GenAI semconv operation name (e.g. invoke_agent), verbatim. Present only on LLM runs."
+    },
+    "serotine.run.failure": {
+      "type": "object",
+      "description": "OPTIONAL failure forensics: the short, human-readable evidence a wrapper already has in hand when a run dies, so a non-zero exit code is not the only thing the product can say about it. Every member is optional and may be omitted or the whole object left off - a line without it is exactly the line this schema accepted before the field existed. Serotine renders these VERBATIM on an authenticated page: they are operator-supplied text, so the emitting wrapper is responsible for redacting anything secret before attaching it. Serotine bounds EVERY member at DISPLAY time (message 500 chars and last_log_line 1000 keeping their head, stderr_tail 20 lines then 4000 chars keeping its end) and neutralises Unicode bidi controls; there is no length keyword here because this schema's vendored validators implement only the keywords it uses. Bodies must be well-formed UTF-8: POST /api/v1/ingest refuses a malformed byte rather than substituting U+FFFD, because these lines are stored verbatim.",
+      "properties": {
+        "message": {
+          "type": "string",
+          "pattern": "\\S",
+          "description": "One line, written for a human: what the wrapper believes went wrong. Must carry at least one non-whitespace character - a blank string would only ever render as an empty box."
+        },
+        "last_log_line": {
+          "type": "string",
+          "pattern": "\\S",
+          "description": "The final line the run wrote to its own log file, verbatim. Must carry at least one non-whitespace character."
+        },
+        "stderr_tail": {
+          "type": "string",
+          "pattern": "\\S",
+          "description": "The tail of the run's stderr, newline-separated, oldest line first. Must carry at least one non-whitespace character; leading whitespace on a line is content and is preserved. Keep it to a tail: Serotine truncates for display and the ingest body has a hard ceiling."
+        }
+      },
+      "additionalProperties": false
+    },
+    "serotine.usage": {
+      "type": "array",
+      "minItems": 1,
+      "description": "One entry per (provider, model) invoked; multi-model runs get one entry each. Omitted entirely on heartbeat-only (non-LLM) runs. Tokens are the source of truth; dollars are derived at ingest.",
+      "items": {
+        "type": "object",
+        "properties": {
+          "gen_ai.provider.name": {
+            "type": "string",
+            "minLength": 1,
+            "description": "OTel GenAI semconv provider name, verbatim (e.g. anthropic; local models use their semconv provider name, e.g. ollama)."
+          },
+          "gen_ai.request.model": {
+            "type": "string",
+            "minLength": 1
+          },
+          "gen_ai.response.model": {
+            "type": "string",
+            "minLength": 1
+          },
+          "gen_ai.usage.input_tokens": {
+            "type": "integer",
+            "minimum": 0
+          },
+          "gen_ai.usage.output_tokens": {
+            "type": "integer",
+            "minimum": 0
+          },
+          "serotine.usage.cache_read_tokens": {
+            "type": "integer",
+            "minimum": 0,
+            "description": "serotine.* extension until OTel semconv stabilizes cache-token attributes; migrates to the official names then (same values, renamed keys)."
+          },
+          "serotine.usage.cache_write_tokens": {
+            "type": "integer",
+            "minimum": 0,
+            "description": "serotine.* extension until OTel semconv stabilizes cache-token attributes."
+          },
+          "serotine.usage.cost_usd": {
+            "type": "number",
+            "minimum": 0,
+            "description": "Advisory only. Ingest recomputes canonically from Serotine's pinned price table and stores both."
+          }
+        },
+        "required": [
+          "gen_ai.provider.name",
+          "gen_ai.request.model",
+          "gen_ai.usage.input_tokens",
+          "gen_ai.usage.output_tokens"
+        ],
+        "additionalProperties": false
+      }
+    }
+  },
+  "required": [
+    "serotine.schema",
+    "serotine.run.id",
+    "serotine.job.label",
+    "host.name",
+    "serotine.run.start",
+    "serotine.run.end",
+    "serotine.run.exit_code",
+    "serotine.run.status",
+    "serotine.run.trigger"
+  ],
+  "additionalProperties": false
+}
