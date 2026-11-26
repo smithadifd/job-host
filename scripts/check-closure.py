@@ -1,6 +1,7 @@
 #!/usr/bin/env python3
 # Matches absolute macOS/Linux/Windows user-home paths, tilde-home paths,
-# and the toolkit repository name as a path component (including GitHub URLs).
+# and the toolkit repository name as a path component (including GitHub URLs,
+# with or without a fragment, query or trailing punctuation).
 # Generic $HOME expressions remain portable runtime defaults, not user paths.
 # Exceptions pin the exact lowercased reference by SHA-256 and tracked path;
 # a reason is mandatory, and an unused exception fails closed.
@@ -31,7 +32,7 @@ REFERENCE = re.compile(
     + r'|[A-Z]:[\\/](?:Us' + r'ers)[\\/][^\\/\s`\"\'<>)]+'
     + r'|~[/\\][A-Za-z0-9_.-][^\s`\"\'<>()[\]]*'
     + r'|(?<![A-Za-z0-9_.-])(?:[^\s`\"\'<>()[\]]*[/\\])' + TOOLKIT
-    + r'(?:\.git)?(?=$|[/\\\s`\"\'<>):])(?:[/\\][^\s`\"\'<>()[\]]*)?'
+    + r'(?:\.git)?(?![A-Za-z0-9_-])(?:[/\\#?][^\s`\"\'<>()[\]]*)?'
     + r'|(?<![A-Za-z0-9_.-])' + TOOLKIT + r'(?:\.git)?[/\\][^\s`\"\'<>()[\]]*',
     re.IGNORECASE,
 )

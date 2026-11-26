@@ -10,6 +10,7 @@ import pytest
 ROOT = Path(__file__).resolve().parents[1]
 HEADER = '# path\tsha256 of lowercased matched reference\treason\n'
 URL = 'https://github.com/example/claude' + '-toolkit/schema.json'
+REPO_URL = 'https://github.com/example/claude' + '-toolkit'
 
 
 def git(repo, *args):
@@ -37,6 +38,8 @@ def run(repo):
     '/Us' + 'ers/example/project', '/ho' + 'me/example/project',
     'C:\\Us' + 'ers\\example\\project', '~' + '/project/file',
     'claude' + '-toolkit/scripts/file', '/opt/claude' + '-toolkit', URL,
+    REPO_URL, REPO_URL + '#readme', REPO_URL + '?tab=readme-ov-file', REPO_URL + '.git#readme',
+    'see ' + REPO_URL + '.', 'see ' + REPO_URL + ', then', '(' + REPO_URL + ')',
 ])
 def test_home_and_toolkit_references_refuse(tmp_path, text):
     repo = build(tmp_path, text + '\n')
@@ -97,6 +100,15 @@ def test_exception_does_not_allow_a_different_reference_in_the_same_file(tmp_pat
 def test_regex_source_and_repository_mentions_are_not_paths(tmp_path):
     text = 'a claude' + '-toolkit mention; regex: ' + '~' + '/(?:pattern)\n'
     result = run(build(tmp_path, text))
+    assert result.returncode == 0, result.stdout
+
+
+@pytest.mark.parametrize('text', [
+    'https://github.com/example/claude' + '-toolkit-extras',
+    'https://github.com/example/claude' + '-toolkitx',
+])
+def test_a_longer_repository_name_is_not_the_toolkit(tmp_path, text):
+    result = run(build(tmp_path, text + '\n'))
     assert result.returncode == 0, result.stdout
 
 
