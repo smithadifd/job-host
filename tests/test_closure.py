@@ -114,7 +114,7 @@ def test_a_longer_repository_name_is_not_the_toolkit(tmp_path, text):
     assert result.returncode == 0, result.stdout
 
 
-@pytest.mark.parametrize('suffix', ['#x', '?x=y'])
+@pytest.mark.parametrize('suffix', ['#x', '?x=y', '@main', ':ro', '%2Fx', ';x', '&x=y'])
 def test_an_allowance_for_the_bare_url_does_not_allow_a_fragment_or_query(tmp_path, suffix):
     row = 'notes.md\t' + hashlib.sha256(REPO_URL.lower().encode()).hexdigest() + '\tpublic URL\n'
     repo = build(tmp_path, REPO_URL + '\n' + REPO_URL + suffix + '\n', row)

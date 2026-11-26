@@ -1,7 +1,10 @@
 #!/usr/bin/env python3
 # Matches absolute macOS/Linux/Windows user-home paths, tilde-home paths,
 # and the toolkit repository name as a path component (including GitHub URLs,
-# with or without a fragment, query or trailing punctuation).
+# with or without a fragment, query or trailing punctuation). After the name,
+# a reference runs to the end of its token: a path, fragment or query tail
+# whole, any other tail less trailing sentence punctuation (. , ; : !), so an
+# allowance for one reference never admits a longer one.
 # Generic $HOME expressions remain portable runtime defaults, not user paths.
 # Exceptions pin the exact lowercased reference by SHA-256 and tracked path;
 # a reason is mandatory, and an unused exception fails closed.
@@ -32,7 +35,8 @@ REFERENCE = re.compile(
     + r'|[A-Z]:[\\/](?:Us' + r'ers)[\\/][^\\/\s`\"\'<>)]+'
     + r'|~[/\\][A-Za-z0-9_.-][^\s`\"\'<>()[\]]*'
     + r'|(?<![A-Za-z0-9_.-])(?:[^\s`\"\'<>()[\]]*[/\\])' + TOOLKIT
-    + r'(?:\.git)?(?!\.?[A-Za-z0-9_-])(?:[/\\#?][^\s`\"\'<>()[\]]*)?'
+    + r'(?:\.git)?(?!\.?[A-Za-z0-9_-])'
+    + r'(?:[/\\#?][^\s`\"\'<>()[\]]*|[^\s`\"\'<>()[\]]*[^\s`\"\'<>()[\].,;:!])?'
     + r'|(?<![A-Za-z0-9_.-])' + TOOLKIT + r'(?:\.git)?[/\\][^\s`\"\'<>()[\]]*',
     re.IGNORECASE,
 )
