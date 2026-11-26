@@ -18,9 +18,10 @@ jobs:
           python-version: "3.12"
       - name: Test dependencies
         run: python3 -m pip install pytest==9.1.1 PyYAML==6.0.3
-      # test_parity.py requires BSD date; the hosted runner supplies GNU date.
+      # macOS-only suites, left out of the hosted ubuntu job: test_parity.py requires BSD date;
+      # test_timeout.py assumes no timeout binary in /bin and macOS process-group kill behaviour.
       - name: Portable job host suites
-        run: python3 -B -m pytest -q -p no:cacheprovider job-host/tests/test_boundary.py job-host/tests/test_lock.py job-host/tests/test_secret_resolution.py job-host/tests/test_split_integrations.py job-host/tests/test_timeout.py
+        run: python3 -B -m pytest -q -p no:cacheprovider job-host/tests/test_boundary.py job-host/tests/test_lock.py job-host/tests/test_secret_resolution.py job-host/tests/test_split_integrations.py
       - name: Resolver installer
         run: python3 -B launchd-kit/test-install-op-resolve.py
       - name: Secret resolver
