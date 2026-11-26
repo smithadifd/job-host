@@ -1,6 +1,6 @@
 {
   "$schema": "https://json-schema.org/draft/2020-12/schema",
-  "$id": "https://github.com/smithadifd/claude-toolkit/launchd-kit/telemetry/serotine-run-v1.schema.json",
+  "$id": "urn:serotine:run:v1",
   "title": "serotine.run.v1",
   "description": "One JSON object per completed run, one line, JSONL. Normative source: foundry roadmaps/fleet.md § Schema (serotine.run.v1) + fleet telemetry decision. Keys defined by OTel semconv are used verbatim (gen_ai.* per GenAI semconv, host.name per general resource semconv); everything Serotine-specific is namespaced serotine.*. Every run emits a line, LLM or not — non-LLM jobs omit gen_ai.*/serotine.usage and the line is pure heartbeat.",
   "type": "object",
