@@ -12,6 +12,7 @@ The pins file's two header lines are fixed parser syntax retained for compatibil
 - `launchd-kit/discord-notify.sh`
 - `launchd-kit/lib.sh`
 - `launchd-kit/serotine_usage.py`
+- `launchd-kit/telemetry/serotine-run-v1.schema.json`
 - `launchd-kit/telemetry/serotine_spool.py`
 - `launchd-kit/telemetry/serotine_trace.py`
 - `launchd-kit/test-serotine-trace.py`
