@@ -14,6 +14,7 @@
 #   (l) Connect fails and `op read` succeeds → stdout/stderr are byte-identical
 #       to the pre-fix contract,
 #   (n) Connect succeeds → stdout/stderr unchanged.
+#   (p) an unset or empty Connect host refuses before either resolver runs.
 #
 # Usage:  bash launchd-kit/test-discord-notify.sh
 set -uo pipefail
@@ -84,6 +85,7 @@ cat > "$STUBS/op-resolve.py" <<EOF
 import os, sys
 from pathlib import Path
 Path("$SB/op-resolve.log").write_text("called\\n")
+Path("$SB/op-connect-host").write_text(os.environ.get("OP_CONNECT_HOST", ""))
 if os.environ.get("OP_RESOLVE_STUB_FAIL") == "1":
     sys.stderr.write("op-resolve: Keychain item op-connect-token absent; Connect token unavailable\\n")
     sys.exit(1)
@@ -104,26 +106,59 @@ fail() { echo "FAIL: $1"; FAILURES=$((FAILURES + 1)); }
 LITERAL_URL="https://discord.com/api/webhooks/PLAINTEXT/LITERAL"
 
 echo "== (a) plaintext literal URL — curl called unchanged =="
-OUT_A="$(echo "hello body" | DISCORD_WEBHOOK_URL="$LITERAL_URL" bash "$SCRIPT" "Test A" 3066993 2>"$SB/a.err")"; RC_A=$?
+OUT_A="$(echo "hello body" | env -u OP_CONNECT_HOST DISCORD_WEBHOOK_URL="$LITERAL_URL" bash "$SCRIPT" "Test A" 3066993 2>"$SB/a.err")"; RC_A=$?
 [[ $RC_A -eq 0 ]] && pass "exit 0" || fail "expected exit 0, got $RC_A"
 grep -q "$LITERAL_URL" "$SB/curl.log" 2>/dev/null && pass "curl received the literal URL" || fail "literal URL not passed to curl"
 [[ ! -f "$SB/op.log" ]] && pass "op NOT invoked on plaintext path" || fail "op invoked on plaintext path"
 grep -q -- "$LITERAL_URL" <<<"$OUT_A" && fail "URL leaked to stdout" || pass "no URL in stdout"
 rm -f "$SB/curl.log" "$SB/op.log" "$SB/security.log"
 
+echo "== (p) op:// without a Connect host — refuse before resolving =="
+printf 'discord-notify: OP_CONNECT_HOST is required for op:// webhooks\n' >"$SB/p.expected.err"
+for host_state in unset empty; do
+  if [[ "$host_state" == unset ]]; then
+    HOST_ENV=(-u OP_CONNECT_HOST)
+  else
+    HOST_ENV=(OP_CONNECT_HOST=)
+  fi
+  echo "hi" | env "${HOST_ENV[@]}" OP_RESOLVE_PY="$STUBS/op-resolve.py" \
+    OP_RESOLVE_STUB_FAIL=1 OP_SERVICE_ACCOUNT_TOKEN=tok \
+    DISCORD_WEBHOOK_URL="op://Automation/discord/webhook" \
+    bash "$SCRIPT" "Missing host" >"$SB/p-$host_state.out" 2>"$SB/p-$host_state.err"
+  RC_P=$?
+  [[ $RC_P -eq 1 ]] && pass "$host_state host exits 1" || fail "$host_state host expected exit 1, got $RC_P"
+  cmp -s "$SB/p.expected.err" "$SB/p-$host_state.err" \
+    && pass "$host_state host emits one named refusal line" \
+    || fail "$host_state host missing exact OP_CONNECT_HOST refusal"
+  [[ ! -f "$SB/op-resolve.log" ]] \
+    && pass "$host_state host: resolver NOT invoked" || fail "$host_state host: resolver invoked"
+  [[ ! -f "$SB/op.log" ]] \
+    && pass "$host_state host: op NOT invoked" || fail "$host_state host: op invoked"
+  [[ ! -f "$SB/security.log" ]] \
+    && pass "$host_state host: Keychain NOT invoked" || fail "$host_state host: Keychain invoked"
+  [[ ! -f "$SB/curl.log" ]] \
+    && pass "$host_state host: curl NOT invoked" || fail "$host_state host: curl invoked"
+  [[ ! -s "$SB/p-$host_state.out" ]] \
+    && pass "$host_state host: stdout empty" || fail "$host_state host: stdout not empty"
+  rm -f "$SB/curl.log" "$SB/op.log" "$SB/security.log" "$SB/op-resolve.log" "$SB/op-connect-host"
+done
+
 echo "== (b0) Connect path — shared resolver owns the Keychain fallback =="
-OUT_B0="$(echo "hi" | env -u OP_CONNECT_TOKEN OP_RESOLVE_PY="$STUBS/op-resolve.py" \
+CONNECT_HOST="http://connect.invalid:8090/path with space/"
+OUT_B0="$(echo "hi" | env -u OP_CONNECT_TOKEN OP_CONNECT_HOST="$CONNECT_HOST" OP_RESOLVE_PY="$STUBS/op-resolve.py" \
   DISCORD_WEBHOOK_URL="op://Automation/discord/webhook" bash "$SCRIPT" "Test B0" \
   2>"$SB/b0.err")"; RC_B0=$?
 [[ $RC_B0 -eq 0 ]] && pass "exit 0" || fail "expected exit 0, got $RC_B0"
 [[ -f "$SB/op-resolve.log" ]] && pass "shared resolver invoked" || fail "shared resolver not invoked"
+[[ "$(cat "$SB/op-connect-host" 2>/dev/null)" == "$CONNECT_HOST" ]] \
+  && pass "resolver received OP_CONNECT_HOST unchanged" || fail "resolver received a changed OP_CONNECT_HOST"
 [[ ! -f "$SB/security.log" ]] && pass "wrapper did not read Keychain" || fail "wrapper read Keychain"
 grep -q "RESOLVED/FROM_CONNECT" "$SB/curl.log" 2>/dev/null && pass "curl received Connect-resolved URL" || fail "Connect-resolved URL not passed to curl"
 grep -qE -- "RESOLVED/FROM_CONNECT|op://" <<<"$OUT_B0" && fail "resolved/op value leaked to stdout" || pass "no secret in stdout"
 rm -f "$SB/curl.log" "$SB/op.log" "$SB/security.log" "$SB/op-resolve.log"
 
 echo "== (b) op:// value — op read + Keychain token fallback =="
-OUT_B="$(echo "hi" | DISCORD_WEBHOOK_URL="op://Automation/discord/webhook" bash "$SCRIPT" "Test B" 2>"$SB/b.err")"; RC_B=$?
+OUT_B="$(echo "hi" | OP_CONNECT_HOST=http://connect.invalid OP_RESOLVE_PY="$SB/missing-resolver.py" DISCORD_WEBHOOK_URL="op://Automation/discord/webhook" bash "$SCRIPT" "Test B" 2>"$SB/b.err")"; RC_B=$?
 [[ $RC_B -eq 0 ]] && pass "exit 0" || fail "expected exit 0, got $RC_B"
 grep -q "op://Automation/discord/webhook" "$SB/op.log" 2>/dev/null && pass "op read called with the op:// ref" || fail "op not called with ref"
 grep -q "op-service-account-token" "$SB/security.log" 2>/dev/null && pass "Keychain token fallback used" || fail "Keychain fallback not used"
@@ -132,7 +167,7 @@ grep -qE -- "RESOLVED/FROM_OP|op://" <<<"$OUT_B" && fail "resolved/op value leak
 rm -f "$SB/curl.log" "$SB/op.log" "$SB/security.log"
 
 echo "== (c) op failure — distinct message + non-zero exit, no HTTP =="
-OUT_C="$(echo "hi" | OP_RESOLVE_STUB_FAIL=1 OP_RESOLVE_PY="$STUBS/op-resolve.py" OP_STUB_FAIL=1 OP_SERVICE_ACCOUNT_TOKEN=tok DISCORD_WEBHOOK_URL="op://Automation/discord/webhook" bash "$SCRIPT" "Test C" 2>"$SB/c.err")"; RC_C=$?
+OUT_C="$(echo "hi" | OP_CONNECT_HOST=http://connect.invalid OP_RESOLVE_STUB_FAIL=1 OP_RESOLVE_PY="$STUBS/op-resolve.py" OP_STUB_FAIL=1 OP_SERVICE_ACCOUNT_TOKEN=tok DISCORD_WEBHOOK_URL="op://Automation/discord/webhook" bash "$SCRIPT" "Test C" 2>"$SB/c.err")"; RC_C=$?
 [[ $RC_C -ne 0 ]] && pass "non-zero exit ($RC_C)" || fail "expected non-zero exit"
 grep -q "1Password resolution failed (op)" "$SB/c.err" && pass "distinct op-failure message present" || fail "distinct message missing"
 grep -qE "discord-notify: HTTP [0-9]" "$SB/c.err" && fail "op failure masqueraded as HTTP failure" || pass "not confused with HTTP failure"
@@ -141,7 +176,7 @@ grep -q -- "op://" <<<"$OUT_C" && fail "op ref leaked to stdout" || pass "no op 
 rm -f "$SB/curl.log" "$SB/op.log" "$SB/security.log" "$SB/op.count"
 
 echo "== (d) cold-start retry — first op read fails, retry resolves =="
-OUT_D="$(echo "hi" | OP_STUB_FAIL_ONCE=1 OP_SERVICE_ACCOUNT_TOKEN=tok DISCORD_WEBHOOK_URL="op://Automation/discord/webhook" bash "$SCRIPT" "Test D" 2>"$SB/d.err")"; RC_D=$?
+OUT_D="$(echo "hi" | OP_CONNECT_HOST=http://connect.invalid OP_RESOLVE_PY="$SB/missing-resolver.py" OP_STUB_FAIL_ONCE=1 OP_SERVICE_ACCOUNT_TOKEN=tok DISCORD_WEBHOOK_URL="op://Automation/discord/webhook" bash "$SCRIPT" "Test D" 2>"$SB/d.err")"; RC_D=$?
 [[ $RC_D -eq 0 ]] && pass "exit 0 after retry" || fail "expected exit 0, got $RC_D"
 [[ "$(grep -c OP_CALLED "$SB/op.log" 2>/dev/null)" == 2 ]] && pass "op read retried exactly once (2 calls)" || fail "expected 2 op calls, got $(grep -c OP_CALLED "$SB/op.log" 2>/dev/null)"
 grep -q "RESOLVED/FROM_OP" "$SB/curl.log" 2>/dev/null && pass "curl received the op-resolved URL after retry" || fail "resolved URL not passed to curl after retry"
@@ -154,7 +189,7 @@ echo "== (e) hung op read — _lk_timeout fires, notifier fails fast (not after 
 # bound so the test doesn't burn 2x90s; the fix is proven by wall-clock time,
 # not just the exit code.
 _start_e=$(date +%s)
-OUT_E="$(echo "hi" | OP_STUB_HANG=1 OP_READ_TIMEOUT_SECS=2 OP_SERVICE_ACCOUNT_TOKEN=tok DISCORD_WEBHOOK_URL="op://Automation/discord/webhook" bash "$SCRIPT" "Test E" 2>"$SB/e.err")"; RC_E=$?
+OUT_E="$(echo "hi" | OP_CONNECT_HOST=http://connect.invalid OP_RESOLVE_PY="$SB/missing-resolver.py" OP_STUB_HANG=1 OP_READ_TIMEOUT_SECS=2 OP_SERVICE_ACCOUNT_TOKEN=tok DISCORD_WEBHOOK_URL="op://Automation/discord/webhook" bash "$SCRIPT" "Test E" 2>"$SB/e.err")"; RC_E=$?
 _elapsed_e=$(( $(date +%s) - _start_e ))
 [[ $RC_E -ne 0 ]] && pass "non-zero exit ($RC_E)" || fail "expected non-zero exit"
 # Retried once (per the cold-start-retry contract): 2 attempts x 2s bound +
@@ -238,7 +273,7 @@ grep -q -- "--content requires a value" "$SB/j.err" && pass "clear usage error o
 rm -f "$SB/curl.log" "$SB/payload.json"
 
 echo "== (k) both paths fail — resolver stderr attributed alongside fallback error =="
-echo "hi" | OP_RESOLVE_STUB_FAIL=1 OP_STUB_FAIL=1 OP_RESOLVE_PY="$STUBS/op-resolve.py" \
+echo "hi" | OP_CONNECT_HOST=http://connect.invalid OP_RESOLVE_STUB_FAIL=1 OP_STUB_FAIL=1 OP_RESOLVE_PY="$STUBS/op-resolve.py" \
   OP_SERVICE_ACCOUNT_TOKEN=tok DISCORD_WEBHOOK_URL="op://Automation/discord/webhook" \
   bash "$SCRIPT" "Test K" >"$SB/k.out" 2>"$SB/k.err"; RC_K=$?
 [[ $RC_K -ne 0 ]] && pass "non-zero exit ($RC_K)" || fail "expected non-zero exit"
@@ -256,7 +291,7 @@ EXPECT_K_FALLBACK="discord-notify: 1Password resolution failed (op) — 'op read
 rm -f "$SB/curl.log" "$SB/op.log" "$SB/security.log" "$SB/op-resolve.log" "$SB/op.count"
 
 echo "== (k2) both paths fail — webhook-shaped URL in resolver stderr is scrubbed =="
-echo "hi" | OP_RESOLVE_STUB_LEAK=1 OP_STUB_FAIL=1 OP_RESOLVE_PY="$STUBS/op-resolve.py" \
+echo "hi" | OP_CONNECT_HOST=http://connect.invalid OP_RESOLVE_STUB_LEAK=1 OP_STUB_FAIL=1 OP_RESOLVE_PY="$STUBS/op-resolve.py" \
   OP_SERVICE_ACCOUNT_TOKEN=tok DISCORD_WEBHOOK_URL="op://Automation/discord/webhook" \
   bash "$SCRIPT" "Test K2" >"$SB/k2.out" 2>"$SB/k2.err"; RC_K2=$?
 [[ $RC_K2 -ne 0 ]] && pass "non-zero exit ($RC_K2)" || fail "expected non-zero exit"
@@ -267,7 +302,7 @@ rm -f "$SB/curl.log" "$SB/op.log" "$SB/security.log" "$SB/op-resolve.log" "$SB/o
 
 echo "== (l) fallback succeeds after op-resolve.py failed — byte-identical to pre-fix =="
 # Pre-fix capture (HEAD 409a553, 2026-09-21): stdout = 'discord-notify: ok (204)\n', stderr empty.
-echo "hi" | OP_RESOLVE_STUB_FAIL=1 OP_RESOLVE_PY="$STUBS/op-resolve.py" \
+echo "hi" | OP_CONNECT_HOST=http://connect.invalid OP_RESOLVE_STUB_FAIL=1 OP_RESOLVE_PY="$STUBS/op-resolve.py" \
   OP_SERVICE_ACCOUNT_TOKEN=tok DISCORD_WEBHOOK_URL="op://Automation/discord/webhook" \
   bash "$SCRIPT" "Today FB" >"$SB/l.out" 2>"$SB/l.err"; RC_L=$?
 [[ $RC_L -eq 0 ]] && pass "exit 0" || fail "expected exit 0, got $RC_L"
@@ -291,7 +326,7 @@ grep -q "RESOLVED/FROM_OP" "$SB/curl.log" 2>/dev/null && pass "curl received the
 rm -f "$SB/curl.log" "$SB/op.log" "$SB/security.log" "$SB/op-resolve.log" "$SB/op.count"
 
 echo "== (n) op-resolve.py succeeds — stdout/stderr unchanged =="
-echo "hi" | OP_RESOLVE_PY="$STUBS/op-resolve.py" \
+echo "hi" | OP_CONNECT_HOST=http://connect.invalid OP_RESOLVE_PY="$STUBS/op-resolve.py" \
   DISCORD_WEBHOOK_URL="op://Automation/discord/webhook" \
   bash "$SCRIPT" "Today OK" >"$SB/n.out" 2>"$SB/n.err"; RC_N=$?
 [[ $RC_N -eq 0 ]] && pass "exit 0" || fail "expected exit 0, got $RC_N"
