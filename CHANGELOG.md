@@ -1,11 +1,17 @@
 # Changelog
 
-## Unreleased
+## 0.1.2 — 2026-11-27
+
+Explicit Connect configuration for `op://` webhook resolution and corrected
+notifier timeout headroom comments. Plaintext webhook URLs are unchanged.
 
 - **Breaking: `op://` webhooks require `OP_CONNECT_HOST`.** Callers must set
   `OP_CONNECT_HOST`; an unset or empty value makes the notifier refuse with
   exit `1` before any Connect resolver or `op` call. Plaintext webhook URLs
   are unchanged.
+
+Upgrade with `v0.1.2`.
+Callers of `op://` webhooks must set `OP_CONNECT_HOST` before upgrading.
 
 ## 0.1.1 — 2026-11-27
 
