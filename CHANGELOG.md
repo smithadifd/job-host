@@ -1,5 +1,12 @@
 # Changelog
 
+## Unreleased
+
+- **Breaking: `op://` webhooks require `OP_CONNECT_HOST`.** Callers must set
+  `OP_CONNECT_HOST`; an unset or empty value makes the notifier refuse with
+  exit `1` before any Connect resolver or `op` call. Plaintext webhook URLs
+  are unchanged.
+
 ## 0.1.1 — 2026-11-27
 
 A handle-free telemetry schema id and documentation that describes the code
