@@ -58,7 +58,7 @@ LK_COLOR_BLURPLE=5793266    # neutral / informational (default)
 # 300s clears that ceiling while staying under the shortest tick in the fleet
 # (morning-brief polls every 10 min), so a wedged notifier releases before the
 # next tick — and lk_single_lock's 120-min stale window covers any overlap
-# regardless. But the HEADROOM IS THIN: ~38s. If any leg above grows (another
+# regardless. But the HEADROOM IS THIN: ~28s. If any leg above grows (another
 # Connect lookup, a longer op retry, a slower webhook), RAISE THIS FIRST — an
 # under-set bound does not fail loudly, it quietly eats real notifications.
 # Override per-wrapper with LK_NOTIFY_TIMEOUT_SECS.

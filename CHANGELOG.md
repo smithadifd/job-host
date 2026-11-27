@@ -3,7 +3,7 @@
 ## 0.1.2 — 2026-11-27
 
 Explicit Connect configuration for `op://` webhook resolution and corrected
-notifier timeout headroom comments. Plaintext webhook URLs are unchanged.
+notifier timeout headroom documentation. Plaintext webhook URLs are unchanged.
 
 - **Breaking: `op://` webhooks require `OP_CONNECT_HOST`.** Callers must set
   `OP_CONNECT_HOST`; an unset or empty value makes the notifier refuse with
