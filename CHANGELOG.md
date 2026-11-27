@@ -1,5 +1,11 @@
 # Changelog
 
+## Unreleased
+
+- Keep the lock-contention test's winner running until every loser exits.
+  A delayed contender can no longer outlast a fixed sleep and appear to
+  violate mutual exclusion through a legitimate later acquisition.
+
 ## 0.1.2 — 2026-11-27
 
 Explicit Connect configuration for `op://` webhook resolution and corrected

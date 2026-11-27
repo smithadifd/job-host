@@ -25,10 +25,18 @@ class LockContentionTest(ScratchCase):
         self.log_dir = self.scratch / "logs"
         self.lock = self.log_dir / ".run.lock"
 
-    def start(self, **extra):
+    def start(self, start_gate=None, **extra):
         env = self.base_env(LOG_DIR=self.log_dir, LK_FORCE="1", **extra)
+        command = [BASH, str(FIXTURE_JOB_HOST)]
+        if start_gate is not None:
+            command = [
+                BASH, "-c",
+                'gate="$1"; shift; '
+                'while [[ ! -f "$gate" ]]; do sleep 0.05; done; exec "$@"',
+                "lock-contender", str(start_gate), *command,
+            ]
         return subprocess.Popen(
-            [BASH, str(FIXTURE_JOB_HOST)],
+            command,
             env=env,
             stdout=subprocess.PIPE,
             stderr=subprocess.PIPE,
@@ -47,11 +55,32 @@ class LockContentionTest(ScratchCase):
         return False
 
     def test_simultaneous_runs_admit_exactly_one(self):
-        procs = [self.start(FIXTURE_BODY="sleep 2") for _ in range(CONTENDERS)]
-        results = [(p.wait(timeout=60), p.stderr.read()) for p in procs]
-        for p in procs:
-            p.stdout.close()
-            p.stderr.close()
+        start_gate = self.scratch / "start"
+        release = self.scratch / "release"
+        # A duration is not a contention boundary: a descheduled contender
+        # could arrive after the holder's sleep and legitimately acquire.
+        # Start together, then keep the winner alive until all losers exit.
+        body = 'while [[ ! -f "%s" ]]; do sleep 0.05; done' % release
+        procs = []
+        try:
+            for _ in range(CONTENDERS):
+                procs.append(self.start(start_gate=start_gate, FIXTURE_BODY=body,
+                                        FIXTURE_TIMEOUT="60"))
+            start_gate.touch()
+            self.assertTrue(self.wait_for(
+                lambda: self.logs().count("fixture body start") > 1
+                or sum(p.poll() is not None for p in procs) >= CONTENDERS - 1),
+                "contenders must take the contended exit while the holder runs")
+            self.assertEqual(self.logs().count("fixture body start"), 1)
+            self.assertEqual(sum(p.poll() is None for p in procs), 1,
+                             "the winner must still hold the lock")
+        finally:
+            start_gate.touch()
+            release.touch()
+            results = []
+            for p in procs:
+                _, err = p.communicate(timeout=60)
+                results.append((p.returncode, err))
 
         self.assertEqual([rc for rc, _ in results], [0] * CONTENDERS)
         self.assertEqual(self.logs().count("fixture body start"), 1)

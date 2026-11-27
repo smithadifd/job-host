@@ -2,12 +2,13 @@
 
 Source commit: `d74803c9a85a43ee83d4278bb0e04292d952c788`. Vendored members: 62.
 
-After the carve, the member files listed below received leaf-local comment and
-documentation edits. Their rows in `scripts/job-host-blobs.tsv` pin the leaf
+After the carve, the member files listed below received leaf-local fixes,
+comment and documentation edits. Their rows in `scripts/job-host-blobs.tsv` pin the leaf
 bytes, not the source commit's blobs. A re-carve must preserve these edits.
 The pins file's two header lines are fixed parser syntax retained for compatibility.
 
 - `job-host/README.md`
+- `job-host/tests/test_lock.py`
 - `launchd-kit/README.md`
 - `launchd-kit/discord-notify.sh`
 - `launchd-kit/lib.sh`

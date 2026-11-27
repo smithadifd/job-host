@@ -11,7 +11,7 @@ job-host/tests/fixtures/fixture-job.sh	c2e20f369f04b7e50576631e22e6af29eec82419
 job-host/tests/fixtures/stub_emit_helper.py	c101fb8e153ed9ebe0503156a15526bba0e1b1e3
 job-host/tests/fixtures/stub_resolver.py	41dd04911b09e366b074415f75f8e665370fdace
 job-host/tests/test_boundary.py	9e79ee6046a9d4bbe63c0bd3a49978cc11f7db27
-job-host/tests/test_lock.py	f44c1945522b6e71311eaa7507b5771338148efe
+job-host/tests/test_lock.py	ac7200c6bf87f76f2ac8ffa26cc2df7a90e37f18
 job-host/tests/test_parity.py	93e95cd1f150beae8970046fe45f820e3e26ea6c
 job-host/tests/test_secret_resolution.py	7e99dc529c265a3bf53af861358b1081cb668757
 job-host/tests/test_split_integrations.py	e3d5e29498ed61be1a438948f420acbdf1c89790
