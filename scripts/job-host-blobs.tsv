@@ -16,8 +16,8 @@ job-host/tests/test_parity.py	93e95cd1f150beae8970046fe45f820e3e26ea6c
 job-host/tests/test_secret_resolution.py	7e99dc529c265a3bf53af861358b1081cb668757
 job-host/tests/test_split_integrations.py	e3d5e29498ed61be1a438948f420acbdf1c89790
 job-host/tests/test_timeout.py	b4dc1ec3e40fa83e88c59c081a35f50d6d425758
-launchd-kit/README.md	3fa861af54461cf2925a4c89130f012748417a5c
-launchd-kit/VERSION	6e8bf73aa550d4c57f6f35830f1bcdc7a4a62f38
+launchd-kit/README.md	7e6a29733d22969352954ff884128fbd83a3e8f9
+launchd-kit/VERSION	17e51c385ea382d4f2ef124b7032c1604845622d
 launchd-kit/discord-notify.md	a1741c1d279a0ea1b68e741c3ac65d5de6a0d4c9
 launchd-kit/discord-notify.sh	22d7d46f881761efdc63eb53f7d376d04747ea5e
 launchd-kit/install-op-resolve.sh	a0cf520bbeae6b69d3e1b0a8767558412edf9333
