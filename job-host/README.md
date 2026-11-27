@@ -56,7 +56,7 @@ available against the native `jh_timeout` and `jh_on_exit` dependencies.
 A recipe is a JSON manifest that records a scheduled job's skill, trigger,
 runtime target discovery, model and trust rung. Repository names do not belong
 in a recipe; the job discovers its targets when it runs. Each job keeps its
-recipe in its own folder as `recipe.json`; the Dependabot sweep's is the first.
+recipe in its own folder as `recipe.json`; the dependency-update job is the first.
 
 Validate a recipe from the repository root, naming the job's folder:
 
@@ -86,6 +86,6 @@ Run `python3 -m pytest job-host/tests -q`, or run each file directly with `pytho
 - `test_timeout.py` checks that a timeout kills the child's process group and records the event. It also covers the spool transport.
 - `test_boundary.py` keeps `BOUNDARY.md` in step with `lib.sh`.
 - `jobs/_lib/tests/test_recipes.py` validates recipe manifests, the regular-job layer boundary,
-  and the compatibility functions used by the Dependabot sweep.
+  and the compatibility functions used by the dependency-update job.
 - `test_split_integrations.py` compares notify bytes, run-record bytes and a
   two-link chain through `lib.sh` and `host.sh`, and checks every include guard.

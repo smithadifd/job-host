@@ -1,7 +1,7 @@
 #!/usr/bin/env python3
 """Unit tests for telemetry/serotine_trace.py — the wrapper-side failure-trace
-body builder (wave row AY7; foundry roadmaps/serotine-user-review-2026-08.md
-finding 13's carried half).
+body builder and its server-compatible payload contract.
+
 
 Run with:  python3 launchd-kit/test-serotine-trace.py
        or:  cd launchd-kit && python3 test-serotine-trace.py
@@ -424,7 +424,7 @@ class TestCli(unittest.TestCase):
 
 
 class TestBuildFailure(unittest.TestCase):
-    """`build_failure` — the serotine.run.failure object (wave row BS8).
+    """`build_failure` — the serotine.run.failure object.
 
     Same module, same redactor, a different destination: three strings that
     ride the run.v1 LINE instead of a separate trace upload. The bounds it

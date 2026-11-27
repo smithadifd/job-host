@@ -2,7 +2,7 @@
 """Stdlib-only spool writer/pusher for Serotine telemetry — the Python sibling
 of lib.sh's `lk_emit_run` / `_lk_push_spool` hooks.
 
-Why this exists (foundry roadmaps/fleet-event-v1.md § Resolutions, item 5):
+Why this exists:
 Python producers (policy-tuner, feed-condenser's audit.py) must not shell out
 to the bash hook — JSON-through-argv quoting and subprocess failure modes fight
 the never-fail-the-producer contract. This helper is homed next to the schema +

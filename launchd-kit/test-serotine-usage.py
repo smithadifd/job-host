@@ -1,7 +1,6 @@
 #!/usr/bin/env python3
 """Unit tests for the Codex/Gemini/OMP/Grok-Build provider usage adapters in
-serotine_usage.py (foundry standards/model-routing.md § Model-id capture;
-ADJUDICATED addendum, claude-toolkit U16 §8).
+serotine_usage.py and their model-id capture contract.
 
 Run with:  python3 launchd-kit/test-serotine-usage.py
        or:  cd launchd-kit && python3 test-serotine-usage.py
@@ -25,8 +24,7 @@ Covers:
   6. Existing-adapter regression: usage_from_claude_json's token members are
      unaffected by any of the above (a light smoke check; the full regression suite lives in
      test-lib.sh section (l) and this repo's other existing tests).
-  6b. The two second-harness seats (claude-toolkit Queue BW row BW2; wire
-     shapes measured in foundry roadmaps/spikes/omp-readiness-2026-09-02.md),
+  6b. The OMP and Grok Build providers,
      each against a REAL capture committed under testdata/ byte-for-byte:
        omp         `--mode json` event stream -> one entry per distinct
                    (provider, model), summed, from the terminal agent_end.
@@ -41,8 +39,8 @@ Covers:
      providers, against the committed schema via the repo's own vendored
      validator (the wire is additionalProperties:false and ingest rejection
      is whole-batch atomic, so an unwireable member must fail here).
-  7. codex-stdout STDOUT wire-shape misdetection (claude-toolkit Queue V,
-     DECIDED CONTRACT): a real captured `codex exec --json` stdout specimen
+  7. codex-stdout STDOUT wire-shape misdetection:
+     a real captured `codex exec --json` stdout specimen
      (testdata/codex-exec-stdout-turn-completed.jsonl) raises
      CodexStdoutWireShapeError loudly instead of returning [] silently;
      detection is pinned to turn.completed+dict-usage with no model-bearing
@@ -125,9 +123,9 @@ def codex_jsonl(model=None, input_tokens=0, output_tokens=0,
 
       turn_context  OUTER-typed: {"type": "turn_context", "payload": {...turn
                     body carrying "model", NO nested "type" key...}}. This is
-                    the shape whose mishandling the PR-#55 review found (the
-                    old unwrap descended into payload, found no inner type,
-                    and silently dropped the served model).
+                    the shape that requires retaining the outer event type:
+                    descending into payload finds no inner type and would
+                    silently drop the served model.
       token_count   WRAPPED: {"type": "event_msg", "payload": {"type":
                     "token_count", "info": {"total_token_usage": {...}}}}.
     """
@@ -163,12 +161,9 @@ def gemini_response(model_version=None, prompt_tokens=0, candidates_tokens=0,
 # --- (1) the standard's two worked examples, verbatim -------------------
 
 class WorkedExampleTests(unittest.TestCase):
-    """foundry standards/model-routing.md § Worked examples. The standard
-    gives EXPECTED OUTPUT fragments + prose only (no raw provider input) and
-    both examples carry identical request/response ids — so per the
-    ADJUDICATED addendum, these tests construct the INPUT per the pinned
-    shapes (§ Input shapes) and assert the OUTPUT matches the standard's
-    fragment field-for-field."""
+    """Two worked examples with identical request/response ids.
+    These tests construct provider inputs and assert the expected output
+    fragments field-for-field."""
 
     def test_codex_worked_example(self):
         raw = codex_jsonl(model="gpt-5.4", input_tokens=4120, output_tokens=880)
@@ -197,14 +192,11 @@ class WorkedExampleTests(unittest.TestCase):
 # --- (2) request != response — the split these adapters exist for -------
 
 class RequestResponseSplitTests(unittest.TestCase):
-    """The standard's Codex worked example narrates a provider reporting a
-    dated alias (gpt-5.4-2026-06-01) that "the wrapper normalized... before
-    emitting" so observed == expected_model. Per the ADJUDICATED addendum,
-    alias normalization stays a WRAPPER-layer concern — this adapter emits
-    the raw response id verbatim, unnormalized. So the standard's own dated-
-    alias scenario is exactly the request != response case the adapter
-    layer must be able to carry (the shape limitation usage_from_claude_json
-    has and these adapters exist to lift)."""
+    """A provider can report a dated alias (gpt-5.4-2026-06-01) while the
+    wrapper requests an undated id. Alias normalization stays a WRAPPER-layer
+    concern — this adapter emits the raw response id verbatim, unnormalized.
+    The adapter must preserve request != response, unlike
+    usage_from_claude_json's single-id representation."""
 
     def test_codex_reports_dated_alias_verbatim(self):
         raw = codex_jsonl(model="gpt-5.4-2026-06-01",
@@ -227,11 +219,11 @@ class RequestResponseSplitTests(unittest.TestCase):
         self.assertNotEqual(e["gen_ai.request.model"], e["gen_ai.response.model"])
 
 
-# --- (2b) the real rollout event shapes — PR #55 review regression -------
+# --- (2b) the real rollout event shapes — parsing regression -------------
 
 class CodexEventShapeTests(unittest.TestCase):
-    """The PR-#55 fresh review empirically probed real $HOME/.codex/sessions
-    rollout files and found the event shapes are NOT uniform: token_count is
+    """Captured $HOME/.codex/sessions rollout files have event shapes that
+    are NOT uniform: token_count is
     WRAPPED under {"type": "event_msg", "payload": {"type": ...}} while
     turn_context is OUTER-typed ({"type": "turn_context"} with the model in a
     payload body that has NO nested "type"). The original unwrap descended
@@ -304,7 +296,7 @@ class CodexEventShapeTests(unittest.TestCase):
         self.assertEqual(su.usage_from_codex_exec_json(raw, request_model="gpt-5.4"), [])
 
     def test_double_wrapped_payload_msg_shape_tolerated(self):
-        # PR #55 codex pass finding 1: the documented protocol shape where
+        # The documented protocol shape where
         # "payload" wraps an id'd "msg" envelope carrying the event's type —
         # {"payload": {"id": ..., "msg": {"type": "token_count", ...}}}.
         raw = "\n".join([
@@ -322,7 +314,7 @@ class CodexEventShapeTests(unittest.TestCase):
         self.assertEqual(entries[0]["gen_ai.response.model"], "gpt-5.4-dw")
 
 
-# --- (2c) multi-model sessions fail closed — PR #55 codex pass finding 2 --
+# --- (2c) multi-model sessions fail closed -------------------------------
 
 class CodexMultiModelTests(unittest.TestCase):
     """total_token_usage is ONE cumulative counter for the whole session, so
@@ -375,7 +367,7 @@ class CodexMultiModelTests(unittest.TestCase):
 # --- (2d) codex-stdout STDOUT wire-shape misdetection — DECIDED CONTRACT --
 
 class CodexStdoutWireShapeTests(unittest.TestCase):
-    """claude-toolkit Queue V (DECIDED CONTRACT, ticket in the PR body):
+    """Codex input contract:
     SEROTINE_USAGE_INPUT for codex MUST be the session ROLLOUT file — raw
     `codex exec --json` STDOUT never carries a served model id at all, so
     pointing SEROTINE_USAGE_INPUT at it is a wiring bug, not an absent-usage
@@ -385,12 +377,11 @@ class CodexStdoutWireShapeTests(unittest.TestCase):
     single word ok' < /dev/null`, captured verbatim, nothing redacted — the
     prompt is trivial) is committed at
     testdata/codex-exec-stdout-turn-completed.jsonl and confirms the shape
-    described in the ticket: a thread.started/item.completed/turn.started/
+    contains a thread.started/item.completed/turn.started/
     turn.completed event stream where token usage rides on a top-level
     "turn.completed" event's "usage" object, and no event anywhere in the
     stream carries a model id (no turn_context event at all — that's a
-    rollout-file-only event). No discrepancy from the ticket's description
-    was found.
+    rollout-file-only event).
 
     Detection must fail LOUDLY (CodexStdoutWireShapeError, not a silent [])
     and stay conservative: pinned to turn.completed + a dict usage object
@@ -474,18 +465,14 @@ class CodexStdoutWireShapeTests(unittest.TestCase):
 # --- (2e) OMP `--mode json` adapter --------------------------------------
 
 class OmpAdapterTests(unittest.TestCase):
-    """`usage_from_omp_json` over a REAL captured OMP `--mode json` event
-    stream, committed verbatim at
-    testdata/omp-mode-json-bucket-grok-build.jsonl (matches the capture
-    except the neutralized cwd path; capture sha256 e762724b…, foundry's
-    roadmaps/spikes/omp-readiness-2026-09-02/captures/bucket-grok-build.jsonl).
+    """`usage_from_omp_json` over the captured OMP `--mode json` event stream
+    in testdata/omp-mode-json-bucket-grok-build.jsonl.
 
-    EXPECTED VALUES ARE THE MEMO'S, not a re-sum of the fixture the way the
-    adapter does it. omp-readiness-2026-09-02.md § Verdicts per HD-3 item, 1:
-    "Bucket run (builder-sized task, `xai-oauth/grok-build`): 7 assistant
-    messages, all `provider=xai-oauth model=grok-build` … 324 events, 0
-    unparseable; totals **132,971 tokens** (17,833 input · 2,498 output ·
-    112,640 cache read · 1,662 reasoning), OMP-notional cost **$0.0511**."
+    Independent expected totals check the adapter's aggregation: 7 assistant
+    messages use provider=xai-oauth and model=grok-build across 324 parseable
+    events. The 132,971 tokens comprise 17,833 input, 2,498 output, and 112,640
+    cache-read tokens; the separately reported reasoning count is 1,662.
+    The advisory cost is $0.0511 to four decimal places; ingest recomputes it.
     """
 
     # --- synthetic builders, structurally faithful to the capture --------
@@ -586,8 +573,8 @@ class OmpAdapterTests(unittest.TestCase):
         self.assertEqual(entry["serotine.usage.cache_read_tokens"], 112640)
 
     def test_captured_stream_carries_omps_notional_cost(self):
-        # The memo's figure ("OMP-notional cost **$0.0511**"), to the memo's
-        # own precision. Advisory only per the schema — ingest recomputes.
+        # The captured stream reports an advisory cost of $0.0511 to four
+        # decimal places. Ingest recomputes it rather than trusting this value.
         raw = _load_fixture("omp-mode-json-bucket-grok-build.jsonl")
         entries = su.usage_from_omp_json(raw, request_model="grok-build")
         self.assertAlmostEqual(entries[0]["serotine.usage.cost_usd"],
@@ -807,11 +794,10 @@ class GrokBuildAdapterTests(unittest.TestCase):
     """`usage_from_grok_build_json` over a REAL captured Grok Build CLI
     1.0.13 `--output-format json` result, committed verbatim at
     testdata/grok-build-output-format-json-run.json (byte-identical, sha256
-    67e66be2…, to foundry's
-    roadmaps/spikes/omp-readiness-2026-09-02/captures/grokbuild-run.json).
+    67e66be2…).
 
-    EXPECTED VALUES ARE THE FIXTURE'S OWN LITERAL BYTES and the memo's
-    Addendum: "output is ONE JSON object with `usage{input_tokens 16,164 ·
+    EXPECTED VALUES ARE THE FIXTURE'S OWN LITERAL BYTES:
+    "output is ONE JSON object with `usage{input_tokens 16,164 ·
     cache_read_input_tokens 64,000 · output_tokens 2,164 · reasoning_tokens
     1,265 · total_tokens 82,328}`, `total_cost_usd 0.0131` … and
     **`modelUsage` keyed by the SERVED id `grok-4.6-build`** (requested
@@ -1120,7 +1106,7 @@ class ValidateUsageEntryTests(unittest.TestCase):
         self.assertEqual(entry["gen_ai.usage.input_tokens"], su._int("42"))
         self.assertEqual(entry["gen_ai.usage.output_tokens"], 0)
 
-    # --- PR #55 codex pass finding 3: schema minimum + bool-as-int -------
+    # --- schema minimum + bool-as-int -----------------------------------
 
     def test_negative_token_count_rejects_whole_entry(self):
         # the schema pins minimum: 0 on every token count; a negative value
@@ -1290,8 +1276,7 @@ class ResolveUsageProviderTests(unittest.TestCase):
                          ["codex", "gemini", "grok-build", "omp"])
 
     def test_omp_provider_end_to_end(self):
-        # The row's OUTCOME, through the real wiring surface: the captured
-        # OMP stream on disk + SEROTINE_USAGE_PROVIDER=omp.
+        # Resolve the captured OMP stream from disk through the provider adapter.
         path = self._input_file(
             _load_fixture("omp-mode-json-bucket-grok-build.jsonl"))
         with scrubbed_env(SEROTINE_USAGE_PROVIDER="omp",
@@ -1301,7 +1286,7 @@ class ResolveUsageProviderTests(unittest.TestCase):
         self.assertEqual(len(entries), 1)
         entry = dict(entries[0])
         cost = entry.pop("serotine.usage.cost_usd")
-        self.assertAlmostEqual(cost, 0.0511, places=4)  # memo's own figure
+        self.assertAlmostEqual(cost, 0.0511, places=4)  # advisory USD, four decimals
         self.assertEqual(entry, {
             "gen_ai.provider.name": "x_ai",
             "gen_ai.request.model": "grok-build",
@@ -1596,7 +1581,7 @@ class ClaudeUsageCostTests(unittest.TestCase):
 
 
 class ResolveFailureTests(unittest.TestCase):
-    """`resolve_failure` — the LAST gate before the spool (wave row BS8).
+    """`resolve_failure` — the last member filter before the spool.
 
     This module never reads a log and never redacts (that is serotine_trace.py,
     where the redactor lives). Its whole job is the member filter, and the
@@ -1706,18 +1691,17 @@ class ResolveFailureTests(unittest.TestCase):
             self.assertEqual(line["serotine.run.failure"], {"message": "why"})
 
 
-# --- (8) BX15 — the fallback-chain's served-id case ----------------------
+# --- (8) the fallback-chain's served-id case ----------------------------
 
 class ChainRequestModelTests(unittest.TestCase):
-    """Wave row BX15 (launchd-kit lib.sh's lk_run_chain): a 2-link brief
-    chain — claude(claude-sonnet-5-5) -> codex(gpt-5.6-sol) — where the run
+    """A 2-link fallback chain (launchd-kit lib.sh's lk_run_chain)
+    — claude(claude-sonnet-5-5) -> codex(gpt-5.6-sol) — where the run
     line's gen_ai.response.model must reflect whichever link actually
     SERVED the run, never a hardcoded "always link 1" default. The chain
     mechanics themselves (advance-on-hard-failure only) live in lib.sh and
-    are proven by launchd-kit/test-lib.sh's (aa) chain matrix; this is the
-    other half of BX15's OUTCOME line — the wrapper's SEROTINE_USAGE_*
-    wiring, exercised through the same real surface (resolve_usage()) a
-    fallen-back-from run-brief.sh would use, per the wrapper contract in
+    are proven by launchd-kit/test-lib.sh's (aa) chain matrix. The
+    wrapper's SEROTINE_USAGE_* wiring is exercised through the same real
+    surface (resolve_usage()) a fallback job would use, per the contract in
     serotine_usage.py's module docstring (`SEROTINE_USAGE_REQUEST_MODEL`
     is the caller's OWN pin for the link that served — never link 1's)."""
 
@@ -1736,7 +1720,7 @@ class ChainRequestModelTests(unittest.TestCase):
     def test_fallen_back_run_records_link_2s_served_id_not_link_1s_pin(self):
         # The chain's link 1 is claude-sonnet-5-5; the wrapper's own pin for
         # link 2 (gen_ai.request.model, never read from the provider) is
-        # gpt-5.6-sol per engine.sh:48/CODEX_MODEL's default. A wrapper bug
+        # gpt-5.6-sol. A wrapper bug
         # that always reported link 1's default regardless of which link
         # served would emit "claude-sonnet-5-5" here — this pins that it does
         # not.

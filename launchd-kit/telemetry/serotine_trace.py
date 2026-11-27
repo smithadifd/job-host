@@ -3,9 +3,9 @@
 `lib.sh`'s `_lk_attach_trace` POSTs to serotine's existing
 `POST /api/v1/ingest/trace?run_id=<serotine.run.id>`.
 
-Wave row AY7 / foundry roadmaps/serotine-user-review-2026-08.md finding 13's
-carried half: serotine's job pages show `Exit 74` with a `—` in the Trace
-column because nothing on the wrapper side has ever attached one. This module
+Without a wrapper-side upload, job pages show `Exit 74` with a `—` in the
+Trace column because no trace has been attached. This module
+supplies that missing upload path and
 turns the tail of a launchd-kit run log into the raw NDJSON body that endpoint
 already accepts. The SERVER side is unchanged — ingest, `/api/v1/traces/…`
 read, and retention all shipped already.
@@ -69,7 +69,7 @@ Every namespace occurrence is the literal, grep-able `serotine.` / `SEROTINE_`
 prefix on purpose (telemetry/README.md § Renaming checklist).
 
 ------------------------------------------------------------------------------
-SECOND CONSUMER — `serotine.run.failure` forensics (wave row BS8)
+SECOND CONSUMER — `serotine.run.failure` forensics
 ------------------------------------------------------------------------------
 `build_failure()` is the same log tail, the same redactor, a different
 destination: the three-member `serotine.run.failure` object that rides the

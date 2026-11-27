@@ -8,8 +8,8 @@ JSON quoting/escaping is correct by construction, and (b) resolve the optional
 `serotine.usage` array by one of three paths (checked in this precedence
 order — see resolve_usage):
 
-  provider   opt-in, non-Claude jobs (foundry standards/model-routing.md §
-             Model-id capture). SEROTINE_USAGE_PROVIDER=codex|gemini|omp|
+  provider   opt-in, non-Claude jobs.
+             SEROTINE_USAGE_PROVIDER=codex|gemini|omp|
              grok-build selects a provider adapter (usage_from_codex_exec_json
              / usage_from_gemini_json / usage_from_omp_json /
              usage_from_grok_build_json, below); SEROTINE_USAGE_INPUT names the
@@ -19,7 +19,7 @@ order — see resolve_usage):
              OWNS the run once selected: it never falls through to either
              path below, and an unrecognized selector is a hard error (raises)
              rather than a silent empty array — see resolve_usage's docstring.
-             DECIDED CONTRACT (codex, claude-toolkit Queue V): SEROTINE_USAGE_INPUT
+             INPUT CONTRACT: SEROTINE_USAGE_INPUT
              for codex MUST be the session ROLLOUT file
              ($HOME/.codex/sessions/**/*.jsonl) — the only codex-side input that
              ever carries a served model id (via its turn_context events).
@@ -38,8 +38,7 @@ order — see resolve_usage):
              model, and wrong attribution is worse than missing usage for
              drift detection. Single-model sessions (the launchd `codex exec`
              case) are unaffected — see _parse_codex_exec_json.
-             SECOND-HARNESS SEATS (foundry roadmaps/spikes/
-             omp-readiness-2026-09-02.md, measured 2026-09-02):
+             ADDITIONAL PROVIDERS (measured 2026-09-02):
                omp         SEROTINE_USAGE_INPUT is the `omp -p --mode json`
                            EVENT STREAM (JSONL). Read from the terminal
                            `agent_end` event's messages[]; one entry per
@@ -80,7 +79,7 @@ order — see resolve_usage):
              that one session's transcript (<projects>/*/<session-id>.jsonl) so
              a concurrent session (an interactive window, or another job) can't
              bleed its models/tokens into a monitored job's rollup — the cause
-             of model-drift false positives (foundry fleet.md session-#22).
+             of model-drift false positives.
              Unset means the whole-tree window walk (backward compatible).
 
              Run scoping (fan-out jobs). A single --session-id can't attribute a
@@ -107,12 +106,12 @@ order — see resolve_usage):
              Precedence: RUN_PREFIX > SESSION_IDS > SESSION_ID > whole-tree. A
              set-but-unmatched run scope yields [] (like SESSION_ID) — it never
              falls back to the whole-tree walk, which would re-introduce the
-             bleed. All three are unset by default (backward compatible). The
-             lib.sh plumb + the fan-out wrappers' --run-id integration are a
-             separate step (foundry model-routing.md; Queue S S14 §3).
+             bleed. All three are unset by default (backward compatible).
+             lib.sh and fan-out wrappers must pass these inputs explicitly
+             to enable run-scoped attribution.
 
 Tokens only. There is deliberately NO price table here — dollars are derived at
-ingest (foundry roadmaps/fleet.md § Schema, fleet telemetry decision). The one cost member on
+ingest. The one cost member on
 the wire, serotine.usage.cost_usd, is PROVIDER-REPORTED and advisory: it is
 copied verbatim from a client that volunteers one (OMP, Grok Build CLI, a
 Claude usage file's own costUSD or total_cost_usd) and never computed, never defaulted to 0, and never treated as authoritative.
@@ -280,18 +279,16 @@ def usage_from_claude_json(obj):
 
 # --- provider adapters: Codex / Gemini usage -> serotine.usage[] -------------
 #
-# foundry standards/model-routing.md § Model-id capture (the "provider_for
-# extension" follow-up) pins the required shape: verbatim OTel gen_ai.* keys,
+# The provider adapters emit verbatim OTel gen_ai.* keys:
 # gen_ai.request.model = the wrapper's OWN pinned canonical id (legitimate —
 # it IS the pin, by definition), gen_ai.response.model = ONLY what the
 # provider itself reports, absent (never fabricated, never copied from the
 # request) when the provider doesn't say. usage_from_claude_json can't
 # express request != response (it forces both to the one id it found); these
-# two adapters are the "provider-specific usage adapter ... next to
-# usage_from_claude_json" that section names as the follow-up, and they carry
-# a differing response id when the provider actually reports one.
+# provider-specific adapters carry a differing response id when the provider
+# actually reports one.
 #
-# Two-layer interface (ADJUDICATED addendum, claude-toolkit U16): a
+# Two-layer interface:
 # per-provider PARSE function turns raw provider output into ONE candidate
 # entry (best-effort, untrusted), then every candidate — from every provider
 # — passes through the single shared _validate_usage_entry() gate before it
@@ -321,8 +318,7 @@ class CodexStdoutWireShapeError(ValueError):
     adapter actually understands. Stdout never carries a served model id, so
     silently emitting from it would mean either a model-less heartbeat (a
     silent, mystifying drift-monitoring gap) or, worse, an inducement to
-    fabricate one — both are the exact failure foundry standards/
-    model-routing.md § "Fail-behavior when the id is missing" forbids. A
+    fabricate one. Missing model identity must never be invented. A
     subclass of ValueError (this module's existing hard-error idiom — see
     _resolve_provider_usage's unrecognized-provider raise) so it is loud by
     construction: uncaught, it exits serotine_usage.py non-zero with this
@@ -356,9 +352,8 @@ class TuiOutputWireShapeError(ValueError):
     wrapper that captured THAT has a wiring bug, not a usage-free run.
     Returning [] would be indistinguishable from a correctly-wired
     heartbeat-only job and would hide the misconfiguration indefinitely;
-    inventing a model id or a token count from prose is the fabrication
-    foundry standards/model-routing.md § "Fail-behavior when the id is
-    missing" forbids outright. ONE class for both clients on purpose: the
+    inventing a model id or a token count from prose would fabricate usage.
+    ONE class for both clients on purpose: the
     failure, the detection rule and the remedy are identical and differ only
     in which flag the message names.
 
@@ -428,7 +423,7 @@ def _validate_usage_entry(candidate):
     coerced via the existing _int() posture (a malformed individual value ->
     0, matching usage_from_claude_json's tolerance for one bad field — see
     the module's "malformed token values" contract) — with two hard bounds
-    the schema imposes (PR #55 codex pass finding 3):
+    the schema imposes:
 
       * a BOOL is a type violation, checked BEFORE the int coercion —
         bool is an int subclass in Python, so _int(True) would silently
@@ -551,8 +546,7 @@ def _codex_event(d):
       double-      {"payload": {"id": ..., "msg": {"type": "token_count",
       wrapped      ...}}} — the documented protocol shape where "payload"
                    wraps an id'd "msg" envelope; the msg dict carries the
-                   event's own type and is the body (codex adversarial pass
-                   on PR #55, finding 1).
+                   event's own type and is the body.
       outer-typed  {"type": "turn_context", "payload": {...turn body, NO
                    nested "type" key...}} — the OUTER type identifies the
                    event and "payload" is the body. This is how turn_context
@@ -590,16 +584,16 @@ def _parse_codex_exec_json(raw):
     unambiguously `codex exec --json` STDOUT rather than the rollout file —
     see DETECTED WIRE-SHAPE MISMATCH, below.
 
-    PROVENANCE NOTE (see PR body): the rollout shape this function actually
-    parses is empirically grounded in AND tested against the real rollout
-    format of `codex exec` output captured locally on this machine
+    PROVENANCE NOTE: the rollout shape this function actually
+    parses is tested against the real rollout
+    format of captured `codex exec` output
     ($HOME/.codex/sessions/**/*.jsonl, "originator": "codex_exec"): token_count
     arrives WRAPPED ({"type": "event_msg", "payload": {"type": "token_count",
     ...}}) while turn_context is OUTER-TYPED ({"type": "turn_context",
     "payload": {...body, no nested type...}}) — see _codex_event.
 
     A separate, REAL capture of `codex exec --json`'s STDOUT stream
-    (claude-toolkit Queue V, codex-cli 0.144.1, `codex exec --json 'reply
+    (codex-cli 0.144.1, `codex exec --json 'reply
     with the single word ok' < /dev/null`, committed verbatim at
     testdata/codex-exec-stdout-turn-completed.jsonl) confirms it is a
     DIFFERENT, INCOMPATIBLE wire shape from the rollout file: a
@@ -634,7 +628,7 @@ def _parse_codex_exec_json(raw):
     the caller's own pin, applied by usage_from_codex_exec_json after this
     function returns.
 
-    KNOWN LIMITATION (adjudicated, PR #55 codex pass finding 2): a session
+    KNOWN LIMITATION: a session
     whose turn_context events report MULTIPLE DISTINCT served models cannot
     be attributed — total_token_usage is one cumulative counter for the whole
     session, so last-model-wins would charge every earlier model's tokens to
@@ -945,10 +939,9 @@ def _parse_omp_json(raw):
     LIMITATION).
 
     Reads the LAST TERMINAL `agent_end` event's `messages[]` and nothing
-    else. The memo that measured this wire shape (foundry roadmaps/spikes/
-    omp-readiness-2026-09-02.md § Verdicts per HD-3 item, 1) pins it: "the
-    final `agent_end` event carries the whole `messages[]` so one read
-    suffices". The per-message `message_end` events carry the same usage and
+    else. The captured wire shape includes the whole `messages[]` array in
+    the final `agent_end` event, so one read suffices.
+    The per-message `message_end` events carry the same usage and
     are deliberately ignored — reading both would double-count.
 
     THREE fail-closed conditions, each returning None (-> [] at the adapter,
@@ -1124,10 +1117,8 @@ def _parse_grok_build_json(raw):
     LIST of untrusted candidate dicts, or None on a structural parse failure.
 
     Reads `modelUsage` and ONLY `modelUsage`. Its KEYS are the SERVED model
-    ids — the request≠response echo the memo measured (foundry roadmaps/
-    spikes/omp-readiness-2026-09-02.md § Addendum: "`modelUsage` keyed by the
-    SERVED id `grok-4.6-build`" for a run that REQUESTED `grok-4.6`) — and
-    its values carry that model's own tokens/calls/cost.
+    ids — a captured run that requested `grok-4.6` reported the served id
+    `grok-4.6-build`. Each value carries that model's own tokens/calls/cost.
 
     The object's top-level `usage` and `total_cost_usd` are deliberately NOT
     read: they are RUN-level totals with no model attached, so on a run that
@@ -1267,9 +1258,8 @@ _PROVIDER_ADAPTERS = {
 
 
 def _resolve_provider_usage(provider):
-    """The SEROTINE_USAGE_PROVIDER opt-in path (foundry standards/
-    model-routing.md § Model-id capture; ADJUDICATED addendum, claude-toolkit
-    U16 §8). Once a wrapper sets SEROTINE_USAGE_PROVIDER, that selector OWNS
+    """The SEROTINE_USAGE_PROVIDER opt-in path.
+    Once a wrapper sets SEROTINE_USAGE_PROVIDER, that selector OWNS
     usage resolution for the run: it is checked BEFORE the explicit
     SEROTINE_USAGE_JSON/FILE (Claude-shape) path and the window fallback, and
     it never falls through to either — the window fallback in particular is
@@ -1482,8 +1472,7 @@ def resolve_usage():
     runs and an explicit disable yield no usage regardless of which path would
     otherwise run.
 
-    Error posture is NOT uniform across paths, by design (ADJUDICATED
-    addendum, claude-toolkit U16 §8): the Claude-shape and window paths stay
+    Error handling differs across paths: the Claude-shape and window paths stay
     best-effort — any error there yields an empty array so a wrapper is never
     failed by a telemetry hook. The provider-adapter path is the one
     exception: config bugs there raise (see _resolve_provider_usage) instead
