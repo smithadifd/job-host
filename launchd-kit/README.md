@@ -2,7 +2,7 @@
 
 Shared boilerplate for macOS **launchd** scheduled-run wrappers.
 
-Release **0.1.1**, carried by the job-host leaf.
+Release **0.1.2**, carried by the job-host leaf.
 
 ## Excluding-principal seats
 
@@ -205,7 +205,7 @@ Set these **before** calling `launchd_kit_init`:
 | `TZ` | no | `America/New_York` | Timezone to pin so scheduled windows are stable. |
 | `LAUNCHD_KIT_PATH` | no | `$HOME/.local/bin:/opt/homebrew/bin:/usr/local/bin:/usr/bin:/bin:/usr/sbin:/sbin` | `PATH` to export for the minimal launchd env. `$HOME/.local/bin` leads because the native Claude Code installer puts `claude` there; the Homebrew cask that used to supply `/opt/homebrew/bin/claude` is gone. Homebrew stays on the path for `gh`/`jq`/`git`. (`HOME` is pinned before `PATH` precisely so this default can interpolate it.) |
 | `NOTIFY_SCRIPT` | no | `$HOME/.claude/scripts/discord-notify.sh` | The shell notifier `lk_notify` shells out to. |
-| `LK_NOTIFY_TIMEOUT_SECS` | no | `300` | Hard bound on the `lk_notify` notifier call (via `_lk_timeout`). Deliberately generous: the stock notifier's worst *legitimate* path — Connect (3 lookups × 2 attempts × 10s = 60s) → `op read` (2 × 90s + 2s = 182s) → `curl` (20s) — is **~262s**, and a bound under that ceiling silently drops real posts instead of preventing a wedge. **Headroom is thin (~38s)**: if any leg grows, raise this first. |
+| `LK_NOTIFY_TIMEOUT_SECS` | no | `300` | Hard bound on the `lk_notify` notifier call (via `_lk_timeout`). Deliberately generous: the stock notifier's worst *legitimate* path — Connect (3 lookups × 2 attempts × 10s = 60s) → `op read` (2 × 90s + 2s = 182s) → `curl` (20s) — is **~262s** (~272s counting the two 5s kill-after graces), and a bound under that ceiling silently drops real posts instead of preventing a wedge. **Headroom is thin (~28s)**: if any leg grows, raise this first. |
 | `DISCORD_WEBHOOK_URL` | no | — | Resolved by the notifier if unset: from the `default` channel (or the one `--channel <name>` or `NOTIFY_CHANNEL` names) of `notify.json`, the one fixed configuration file in the toolkit configuration folder (`$XDG_CONFIG_HOME/claude-toolkit/` when absolute, else `$HOME/.config/claude-toolkit/`; schema in [`scripts/notify-sink.md`](../scripts/notify-sink.md)). **Never logged.** |
 | `NOTIFY_CHANNEL` | no | `default` | The `notify.json` channel the notifier posts to when no `--channel` flag is given. `lk_notify` passes no flags, so a wrapper picks its channel by exporting this. Letters, digits, `.`, `_` and `-` only; any other value makes the notifier exit `2`. |
 | `WEBHOOK_ENV_FILE` | no | (notifier default) | Legacy, for one release: while `notify.json` is absent, the notifier reads `DISCORD_WEBHOOK_URL` from this env file as data (never sourced) and prints a deprecation line. |
