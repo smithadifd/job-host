@@ -16,10 +16,10 @@ job-host/tests/test_parity.py	93e95cd1f150beae8970046fe45f820e3e26ea6c
 job-host/tests/test_secret_resolution.py	7e99dc529c265a3bf53af861358b1081cb668757
 job-host/tests/test_split_integrations.py	e3d5e29498ed61be1a438948f420acbdf1c89790
 job-host/tests/test_timeout.py	b4dc1ec3e40fa83e88c59c081a35f50d6d425758
-launchd-kit/README.md	7e6a29733d22969352954ff884128fbd83a3e8f9
+launchd-kit/README.md	e9f77599c5cf6f0c96dc0422101e81d5b1f23d35
 launchd-kit/VERSION	17e51c385ea382d4f2ef124b7032c1604845622d
-launchd-kit/discord-notify.md	a1741c1d279a0ea1b68e741c3ac65d5de6a0d4c9
-launchd-kit/discord-notify.sh	22d7d46f881761efdc63eb53f7d376d04747ea5e
+launchd-kit/discord-notify.md	25ea7d398060b59db7cff21251d5fec56d818b79
+launchd-kit/discord-notify.sh	1742c198e46c82629df594fc6f4b92eed76931b1
 launchd-kit/install-op-resolve.sh	a0cf520bbeae6b69d3e1b0a8767558412edf9333
 launchd-kit/lib.sh	c73aac6075c11135a1b9ab46ec9bb9236b9e4636
 launchd-kit/lib/chain.sh	23fcf8df7dec696f0838913fca60b90bac5bfcbf
@@ -53,7 +53,7 @@ launchd-kit/telemetry/serotine-run-v1.schema.json	2ffdd069ddfd8b27c87d41a2645ad3
 launchd-kit/telemetry/serotine_spool.py	6c4191d8a0845f3ceb787045710d871e72bdfbfa
 launchd-kit/telemetry/serotine_trace.py	82bc4263ce302400c4ce04c3df60187623651c22
 launchd-kit/telemetry/validate_serotine_run.py	28becc04dff6cadf89708f1ef07ba4a4f2ebc4b8
-launchd-kit/test-discord-notify.sh	b1dde8f5f55e07a0ac8ce4389fbdf689dd82b004
+launchd-kit/test-discord-notify.sh	53f67751276ec0c7a705e9f5684b92c2a4bc1c90
 launchd-kit/test-install-op-resolve.py	92e379bc7f602e2b2357d2704a5f443fbc6a54ad
 launchd-kit/test-op-resolve.py	a4a725095d0b258769e6afc442dc42e308c6c4e5
 launchd-kit/test-serotine-trace.py	77f9791e2a4ee142885b1c3ee7440946b35dd994

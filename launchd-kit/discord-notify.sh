@@ -45,11 +45,11 @@
 # 1Password (op://) support:
 #   If the resolved DISCORD_WEBHOOK_URL is an `op://vault/item/field` reference
 #   (typical of a 1Password-migrated env file) rather than a literal URL, it is
-#   resolved with `op read`. The service-account token comes from
-#   $OP_SERVICE_ACCOUNT_TOKEN if set, otherwise from the macOS Keychain item
-#   `op-service-account-token`. A plaintext (literal-URL) env file behaves
-#   byte-identically to the pre-op contract — the op path engages ONLY when the
-#   value literally starts with `op://`.
+#   resolved through Connect first; OP_CONNECT_HOST must be non-empty. Without
+#   it, the notifier refuses before calling either resolver. After a Connect
+#   failure, legacy `op read` uses $OP_SERVICE_ACCOUNT_TOKEN if set, otherwise
+#   the macOS Keychain item `op-service-account-token`. A plaintext URL is
+#   unchanged — the op path engages ONLY when the value starts with `op://`.
 #
 # This is the canonical, version-controlled copy of the machine-local notifier
 # at $HOME/.claude/scripts/discord-notify.sh. The contract is in
@@ -433,6 +433,12 @@ fi
 # emit a DISTINCT stderr message (unmistakably different from a webhook/HTTP
 # failure) and exit non-zero — a 1Password outage is its own failure mode.
 if [[ "$DISCORD_WEBHOOK_URL" == op://* ]]; then
+  __OCH="${OP_CONNECT_HOST:-}"
+  if [[ -z "$__OCH" ]]; then
+    echo "discord-notify: OP_CONNECT_HOST is required for op:// webhooks" >&2
+    exit 1
+  fi
+
   RESOLVED_URL=""
   __OPR_STDERR=""
 
@@ -441,14 +447,13 @@ if [[ "$DISCORD_WEBHOOK_URL" == op://* ]]; then
   # container and the macOS "access data from other apps" TCC gate never fires
   # (that gate — attributed to the calling bash — is what hung/killed this
   # notifier and silently dropped posts).
-  # Python holds the LNP grant, so it reaches the LAN Connect server under launchd.
+  # The caller supplies the Connect host; this notifier has no default address.
   # The shared resolver lookup order (launchd-kit/README.md § Where consumers
   # find op-resolve.py) stops at the machine-local mirror here, on purpose:
   # this notifier runs under launchd from paths that are not a checkout, and
   # its own last resort is the legacy `op read` fallback below, not a repo
   # copy. install-op-resolve.sh is what keeps the mirror's bytes canonical.
   __OPR="${OP_RESOLVE_PY:-$HOME/.claude/scripts/op-resolve.py}"
-  __OCH="${OP_CONNECT_HOST:-http://192.168.50.88:8090}"
   if [[ -f "$__OPR" ]] && command -v python3 >/dev/null 2>&1; then
     # Capture Connect-resolver stderr instead of discarding it. Emit it only
     # when the legacy `op read` fallback ALSO fails — a successful fallback

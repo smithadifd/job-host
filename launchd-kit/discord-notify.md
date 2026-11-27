@@ -30,6 +30,14 @@ If none resolves, it prints `discord-notify: no DISCORD_WEBHOOK_URL configured` 
 
 A value that starts with `op://` is a 1Password reference and is resolved before use; a literal URL behaves exactly as before. A resolution failure prints a distinct `discord-notify: 1Password resolution failed` message and exits non-zero, so a vault outage is distinguishable from a webhook or HTTP failure.
 
+For `op://` values, `OP_CONNECT_HOST` is required and passed unchanged to the
+Connect resolver. If it is unset or empty, the script prints exactly
+`discord-notify: OP_CONNECT_HOST is required for op:// webhooks` on stderr and
+exits `1`, without invoking the Connect resolver or legacy `op read`. With a
+non-empty host, Connect is tried first; only a Connect failure or unavailable
+resolver permits the legacy `op read` fallback. Plaintext webhook URLs do not
+require `OP_CONNECT_HOST` and follow the same delivery path as before.
+
 ### Secrets hygiene
 
 - The webhook URL is a secret. Never log it, echo it back in a response, or write it to a state or data file. Where state must be keyed on a webhook (for example a cooldown map), key on its `sha256`.

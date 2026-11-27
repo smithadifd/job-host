@@ -205,7 +205,7 @@ Set these **before** calling `launchd_kit_init`:
 | `TZ` | no | `America/New_York` | Timezone to pin so scheduled windows are stable. |
 | `LAUNCHD_KIT_PATH` | no | `$HOME/.local/bin:/opt/homebrew/bin:/usr/local/bin:/usr/bin:/bin:/usr/sbin:/sbin` | `PATH` to export for the minimal launchd env. `$HOME/.local/bin` leads because the native Claude Code installer puts `claude` there; the Homebrew cask that used to supply `/opt/homebrew/bin/claude` is gone. Homebrew stays on the path for `gh`/`jq`/`git`. (`HOME` is pinned before `PATH` precisely so this default can interpolate it.) |
 | `NOTIFY_SCRIPT` | no | `$HOME/.claude/scripts/discord-notify.sh` | The shell notifier `lk_notify` shells out to. |
-| `LK_NOTIFY_TIMEOUT_SECS` | no | `300` | Hard bound on the `lk_notify` notifier call (via `_lk_timeout`). Deliberately generous: the stock notifier's worst *legitimate* path — Connect (3 lookups × 2 attempts × 10s = 60s) → `op read` (2 × 90s + 2s = 182s) → `curl` (20s) — is **~262s**, and a bound under that ceiling silently drops real posts instead of preventing a wedge. **Headroom is thin (~28s)**: if any leg grows, raise this first. |
+| `LK_NOTIFY_TIMEOUT_SECS` | no | `300` | Hard bound on the `lk_notify` notifier call (via `_lk_timeout`). Deliberately generous: the stock notifier's worst *legitimate* path — Connect (3 lookups × 2 attempts × 10s = 60s) → `op read` (2 × 90s + 2s = 182s) → `curl` (20s) — is **~262s**, and a bound under that ceiling silently drops real posts instead of preventing a wedge. **Headroom is thin (~38s)**: if any leg grows, raise this first. |
 | `DISCORD_WEBHOOK_URL` | no | — | Resolved by the notifier if unset: from the `default` channel (or the one `--channel <name>` or `NOTIFY_CHANNEL` names) of `notify.json`, the one fixed configuration file in the toolkit configuration folder (`$XDG_CONFIG_HOME/claude-toolkit/` when absolute, else `$HOME/.config/claude-toolkit/`; schema in [`scripts/notify-sink.md`](../scripts/notify-sink.md)). **Never logged.** |
 | `NOTIFY_CHANNEL` | no | `default` | The `notify.json` channel the notifier posts to when no `--channel` flag is given. `lk_notify` passes no flags, so a wrapper picks its channel by exporting this. Letters, digits, `.`, `_` and `-` only; any other value makes the notifier exit `2`. |
 | `WEBHOOK_ENV_FILE` | no | (notifier default) | Legacy, for one release: while `notify.json` is absent, the notifier reads `DISCORD_WEBHOOK_URL` from this env file as data (never sourced) and prints a deprecation line. |
@@ -696,10 +696,15 @@ of a literal URL, e.g.:
 DISCORD_WEBHOOK_URL="op://YourVault/discord-webhook/url"
 ```
 
-After resolution, if `DISCORD_WEBHOOK_URL` **literally starts with `op://`** the
-notifier resolves it with `op read`. This is strictly backward-compatible: a
-plaintext env file (literal URL) never touches the op path and behaves
-byte-identically to the pre-op contract.
+After resolution, if `DISCORD_WEBHOOK_URL` **literally starts with `op://`**,
+`OP_CONNECT_HOST` is required and passed unchanged to the Connect resolver.
+If it is unset or empty, the script prints exactly
+`discord-notify: OP_CONNECT_HOST is required for op:// webhooks` on stderr and
+exits `1`, without invoking the Connect resolver or legacy `op read`. With a
+non-empty host, Connect is tried first; only a Connect failure or unavailable
+resolver permits the bounded legacy `op read` fallback. A plaintext env file
+(literal URL) never touches the op path, does not require `OP_CONNECT_HOST`,
+and behaves byte-identically to the pre-op contract.
 
 **`op read` is bounded, not bare.** `op` has no built-in timeout and can hang
 indefinitely under the macOS TCC app-data gate (the desktop app's container
@@ -709,7 +714,7 @@ probe blocking under display-sleep). The `op read` call is routed through
 distinct stderr message and non-zero exit as any other op failure, instead of
 wedging the notifier — and the launcher parked on it — forever.
 
-The `op` service-account token is sourced in this order:
+For the legacy fallback, the `op` service-account token is sourced in this order:
 
 1. `$OP_SERVICE_ACCOUNT_TOKEN` from the environment if set.
 2. Otherwise the macOS Keychain item `op-service-account-token`
@@ -717,18 +722,23 @@ The `op` service-account token is sourced in this order:
    as `OP_SERVICE_ACCOUNT_TOKEN` before calling `op`.
 
 **Distinct op-failure mode.** Per the 1Password secrets decision, "op failed" is a new failure mode
-that must be distinguishable from a webhook/HTTP failure. When the `op` binary
-is missing, no token is available, or `op read` cannot resolve the reference,
+that must be distinguishable from a webhook/HTTP failure. After Connect fails
+or is unavailable, if the `op` binary is missing, no token is available, or
+`op read` cannot resolve the reference,
 the notifier prints a message prefixed `discord-notify: 1Password resolution
-failed (op) — …` and exits non-zero **before** any HTTP request — so a
+failed (op) — …` and exits non-zero **before** any webhook HTTP request — so a
 1Password outage never masquerades as a Discord/webhook error.
 
 ### Smoke test
 
 [`test-discord-notify.sh`](./test-discord-notify.sh) exercises the notifier with
-stubbed `curl`, `op`, and `security` on `PATH` (no network, no real 1Password):
-it proves the plaintext literal-URL path calls `curl` unchanged, an `op://`
-value triggers `op read` (via the Keychain token fallback) and uses its output,
+stubbed `curl`, `op`, `security`, and a Connect resolver (no network, no real
+1Password): it proves the plaintext literal-URL path calls `curl` unchanged
+without `OP_CONNECT_HOST`, an `op://` value with an unset or empty host refuses
+with the exact message above and exits `1` before either resolver or `curl`
+runs, and a non-empty host is passed unchanged to the Connect resolver.
+Connect success skips `op`; Connect failure or an unavailable resolver permits
+`op read` (via the Keychain token fallback) and uses its output. It also proves
 an `op` failure produces the distinct stderr message and non-zero exit, a hung
 `op` (stubbed as a 60s sleep) fails fast via `_lk_timeout` instead of wedging
 the notifier, and the webhook URL never appears on stdout. Run it with `bash
