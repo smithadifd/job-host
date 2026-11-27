@@ -2,7 +2,7 @@
 
 Shared boilerplate for macOS **launchd** scheduled-run wrappers.
 
-Release **0.1.0**: first release version, carried by the job-host leaf.
+Release **0.1.1**, carried by the job-host leaf.
 
 ## Excluding-principal seats
 

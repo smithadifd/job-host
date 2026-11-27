@@ -17,6 +17,9 @@ The pins file's two header lines are fixed parser syntax retained for compatibil
 - `launchd-kit/test-serotine-trace.py`
 - `launchd-kit/test-serotine-usage.py`
 
+`launchd-kit/VERSION` is also pinned to its leaf bytes: from 0.1.1 it carries
+the leaf's release number, so a re-carve must keep the leaf's value.
+
 `.job-host-manifest` is UTF-8, LF-terminated, with optional `tree <folder>/`
 lines followed by byte-sorted member paths. Every tree folder must contain
 only members. There are no tree lines in the initial carve. Seeds and filled
