@@ -3,7 +3,9 @@
 ## Unreleased
 
 Reword documentation and comments to describe scheduled jobs, telemetry and
-input contracts directly. Runtime values and byte-pinned text are unchanged.
+input contracts directly. Runtime values and test expectations are unchanged.
+Refresh member blob pins to record these leaf-local comment and documentation
+edits after the carve; future carves must preserve them.
 
 ## Initial carve
 

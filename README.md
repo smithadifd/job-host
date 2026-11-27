@@ -18,5 +18,6 @@ loading it yourself. Installation never loads a job or changes shell startup.
 ## Provenance
 
 This tree was carved from commit `d74803c9a85a43ee83d4278bb0e04292d952c788`. `.job-host-manifest` lists only
-vendored members. `VENDORING.md` records the byte comparisons. Repository docs,
-installer, workflow and example plist are not vendored members.
+vendored members. `VENDORING.md` records the initial byte comparisons and the
+leaf-local comment and documentation edits that later member pins preserve.
+Repository docs, installer, workflow and example plist are not vendored members.

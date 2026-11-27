@@ -123,9 +123,9 @@ def codex_jsonl(model=None, input_tokens=0, output_tokens=0,
 
       turn_context  OUTER-typed: {"type": "turn_context", "payload": {...turn
                     body carrying "model", NO nested "type" key...}}. This is
-                    the shape whose mishandling the PR-#55 review found (the
-                    old unwrap descended into payload, found no inner type,
-                    and silently dropped the served model).
+                    the shape that requires retaining the outer event type:
+                    descending into payload finds no inner type and would
+                    silently drop the served model.
       token_count   WRAPPED: {"type": "event_msg", "payload": {"type":
                     "token_count", "info": {"total_token_usage": {...}}}}.
     """
@@ -465,17 +465,14 @@ class CodexStdoutWireShapeTests(unittest.TestCase):
 # --- (2e) OMP `--mode json` adapter --------------------------------------
 
 class OmpAdapterTests(unittest.TestCase):
-    """`usage_from_omp_json` over a REAL captured OMP `--mode json` event
-    stream, committed verbatim at
-    testdata/omp-mode-json-bucket-grok-build.jsonl (matches the capture
-    except the neutralized cwd path; capture sha256 e762724b…).
+    """`usage_from_omp_json` over the captured OMP `--mode json` event stream
+    in testdata/omp-mode-json-bucket-grok-build.jsonl.
 
-    EXPECTED VALUES ARE INDEPENDENT CONSTANTS, not a re-sum of the fixture
-    the way the adapter does it:
-    "Captured run (`xai-oauth/grok-build`): 7 assistant
-    messages, all `provider=xai-oauth model=grok-build` … 324 events, 0
-    unparseable; totals **132,971 tokens** (17,833 input · 2,498 output ·
-    112,640 cache read · 1,662 reasoning), OMP-notional cost **$0.0511**."
+    Independent expected totals check the adapter's aggregation: 7 assistant
+    messages use provider=xai-oauth and model=grok-build across 324 parseable
+    events. The 132,971 tokens comprise 17,833 input, 2,498 output, and 112,640
+    cache-read tokens; the separately reported reasoning count is 1,662.
+    The advisory cost is $0.0511 to four decimal places; ingest recomputes it.
     """
 
     # --- synthetic builders, structurally faithful to the capture --------
@@ -576,8 +573,8 @@ class OmpAdapterTests(unittest.TestCase):
         self.assertEqual(entry["serotine.usage.cache_read_tokens"], 112640)
 
     def test_captured_stream_carries_omps_notional_cost(self):
-        # The memo's figure ("OMP-notional cost **$0.0511**"), to the memo's
-        # own precision. Advisory only per the schema — ingest recomputes.
+        # The captured stream reports an advisory cost of $0.0511 to four
+        # decimal places. Ingest recomputes it rather than trusting this value.
         raw = _load_fixture("omp-mode-json-bucket-grok-build.jsonl")
         entries = su.usage_from_omp_json(raw, request_model="grok-build")
         self.assertAlmostEqual(entries[0]["serotine.usage.cost_usd"],
@@ -1279,8 +1276,7 @@ class ResolveUsageProviderTests(unittest.TestCase):
                          ["codex", "gemini", "grok-build", "omp"])
 
     def test_omp_provider_end_to_end(self):
-        # The row's OUTCOME, through the real wiring surface: the captured
-        # OMP stream on disk + SEROTINE_USAGE_PROVIDER=omp.
+        # Resolve the captured OMP stream from disk through the provider adapter.
         path = self._input_file(
             _load_fixture("omp-mode-json-bucket-grok-build.jsonl"))
         with scrubbed_env(SEROTINE_USAGE_PROVIDER="omp",
@@ -1290,7 +1286,7 @@ class ResolveUsageProviderTests(unittest.TestCase):
         self.assertEqual(len(entries), 1)
         entry = dict(entries[0])
         cost = entry.pop("serotine.usage.cost_usd")
-        self.assertAlmostEqual(cost, 0.0511, places=4)  # memo's own figure
+        self.assertAlmostEqual(cost, 0.0511, places=4)  # advisory USD, four decimals
         self.assertEqual(entry, {
             "gen_ai.provider.name": "x_ai",
             "gen_ai.request.model": "grok-build",
@@ -1585,7 +1581,7 @@ class ClaudeUsageCostTests(unittest.TestCase):
 
 
 class ResolveFailureTests(unittest.TestCase):
-    """`resolve_failure` — the LAST gate before the spool (wave row BS8).
+    """`resolve_failure` — the last member filter before the spool.
 
     This module never reads a log and never redacts (that is serotine_trace.py,
     where the redactor lives). Its whole job is the member filter, and the

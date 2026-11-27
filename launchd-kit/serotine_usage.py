@@ -1472,8 +1472,7 @@ def resolve_usage():
     runs and an explicit disable yield no usage regardless of which path would
     otherwise run.
 
-    Error posture is NOT uniform across paths, by design (ADJUDICATED
-    addendum, claude-toolkit U16 §8): the Claude-shape and window paths stay
+    Error handling differs across paths: the Claude-shape and window paths stay
     best-effort — any error there yields an empty array so a wrapper is never
     failed by a telemetry hook. The provider-adapter path is the one
     exception: config bugs there raise (see _resolve_provider_usage) instead

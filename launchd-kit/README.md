@@ -317,15 +317,12 @@ mirrors `_lk_push_spool` exactly (same env contract, cursor advances only on
 **fail-closed** — findings are spool-only and never leave the machine. Same
 safety posture: the public functions never raise and never log the token.
 
-#### Failure traces — opt-in, **OFF fleet-wide** (AY7)
+#### Failure traces — opt-in, **OFF fleet-wide**
 
-serotine's job pages have always had a **Trace** column and have always shown
-`—` in it, because the server half shipped (`POST /api/v1/ingest/trace`,
-`GET /api/v1/traces/<run-id>`, retention) and the wrapper half never did
-(Serotine user-review finding 13). This closes
-it: on a **failing** run the wrapper uploads the tail of its own `$LOG` as that
-run's trace, so `Exit 74` carries its stderr into the dashboard instead of
-requiring an SSH into the host.
+On a **failing** run the wrapper can upload the tail of its own `$LOG` as that
+run's trace through `POST /api/v1/ingest/trace`. The job page retrieves it through
+`GET /api/v1/traces/<run-id>`, so `Exit 74` carries its stderr into the dashboard
+instead of requiring an SSH connection to the host.
 
 **Nothing changes until a job opts in.** With `SEROTINE_TRACE_CAPTURE` unset —
 the default everywhere — the hook returns on its first line: no subprocess, no

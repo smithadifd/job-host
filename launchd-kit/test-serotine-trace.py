@@ -424,7 +424,7 @@ class TestCli(unittest.TestCase):
 
 
 class TestBuildFailure(unittest.TestCase):
-    """`build_failure` — the serotine.run.failure object (wave row BS8).
+    """`build_failure` — the serotine.run.failure object.
 
     Same module, same redactor, a different destination: three strings that
     ride the run.v1 LINE instead of a separate trace upload. The bounds it

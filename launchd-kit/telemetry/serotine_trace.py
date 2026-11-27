@@ -69,7 +69,7 @@ Every namespace occurrence is the literal, grep-able `serotine.` / `SEROTINE_`
 prefix on purpose (telemetry/README.md § Renaming checklist).
 
 ------------------------------------------------------------------------------
-SECOND CONSUMER — `serotine.run.failure` forensics (wave row BS8)
+SECOND CONSUMER — `serotine.run.failure` forensics
 ------------------------------------------------------------------------------
 `build_failure()` is the same log tail, the same redactor, a different
 destination: the three-member `serotine.run.failure` object that rides the

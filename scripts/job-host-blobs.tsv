@@ -16,7 +16,7 @@ job-host/tests/test_parity.py	93e95cd1f150beae8970046fe45f820e3e26ea6c
 job-host/tests/test_secret_resolution.py	7e99dc529c265a3bf53af861358b1081cb668757
 job-host/tests/test_split_integrations.py	e3d5e29498ed61be1a438948f420acbdf1c89790
 job-host/tests/test_timeout.py	b4dc1ec3e40fa83e88c59c081a35f50d6d425758
-launchd-kit/README.md	2aa4b5736ab33ca741213f35b0af4b5fb7b4f3ef
+launchd-kit/README.md	3fa861af54461cf2925a4c89130f012748417a5c
 launchd-kit/VERSION	6e8bf73aa550d4c57f6f35830f1bcdc7a4a62f38
 launchd-kit/discord-notify.md	a1741c1d279a0ea1b68e741c3ac65d5de6a0d4c9
 launchd-kit/discord-notify.sh	22d7d46f881761efdc63eb53f7d376d04747ea5e
@@ -26,7 +26,7 @@ launchd-kit/lib/chain.sh	23fcf8df7dec696f0838913fca60b90bac5bfcbf
 launchd-kit/lib/notify.sh	ee938e201accdf127b35ad7101563a2a1f970a61
 launchd-kit/lib/telemetry.sh	2fe1002ab69db14707a8c777f39da1f414129143
 launchd-kit/op-resolve.py	7113ba5831ccdb31add0fbe9652f82dde93d623d
-launchd-kit/serotine_usage.py	33951f655c828b7146bd2d8fdafdebbb8760817c
+launchd-kit/serotine_usage.py	6bfa95bd1abd429bce1afb0914a8bf2245484f0d
 launchd-kit/telemetry/fixtures/invalid/bad-run-id-pattern.jsonl	71dac9a887973587da57919ac7059aba0c9cd9e3
 launchd-kit/telemetry/fixtures/invalid/bad-status-enum.jsonl	d248ae5c342cf5351d2081be92437320321f536a
 launchd-kit/telemetry/fixtures/invalid/bad-timestamp.jsonl	48fa2fd8857a41b35f1ea4682d70ea7fd2a58e26
@@ -51,13 +51,13 @@ launchd-kit/telemetry/fixtures/valid/llm-run.jsonl	64ec69dcdfd974515e4f34d40e664
 launchd-kit/telemetry/fixtures/valid/skip-run.jsonl	1608251f37ac3c4f3443cc7f5710ee886fdcf324
 launchd-kit/telemetry/serotine-run-v1.schema.json	2ffdd069ddfd8b27c87d41a2645ad36334342a1a
 launchd-kit/telemetry/serotine_spool.py	6c4191d8a0845f3ceb787045710d871e72bdfbfa
-launchd-kit/telemetry/serotine_trace.py	ad770bf4b7139302289dc8065694be880c523272
+launchd-kit/telemetry/serotine_trace.py	82bc4263ce302400c4ce04c3df60187623651c22
 launchd-kit/telemetry/validate_serotine_run.py	28becc04dff6cadf89708f1ef07ba4a4f2ebc4b8
 launchd-kit/test-discord-notify.sh	b1dde8f5f55e07a0ac8ce4389fbdf689dd82b004
 launchd-kit/test-install-op-resolve.py	92e379bc7f602e2b2357d2704a5f443fbc6a54ad
 launchd-kit/test-op-resolve.py	a4a725095d0b258769e6afc442dc42e308c6c4e5
-launchd-kit/test-serotine-trace.py	2017357284c3fb59ec22d8c928ffa53b2b04a413
-launchd-kit/test-serotine-usage.py	1594df12852e317035dfc73a005b27f0c9b96970
+launchd-kit/test-serotine-trace.py	77f9791e2a4ee142885b1c3ee7440946b35dd994
+launchd-kit/test-serotine-usage.py	493f6a0d4a28b9b478c45859193b4d3625b1769c
 launchd-kit/test_discord_notify_dry_run.py	bd3e348e50cd900a3a6ce9cb137ea2155edf2dc5
 launchd-kit/testdata/codex-exec-stdout-turn-completed.jsonl	61abd990a96ea32bab0511694362fbe148d94336
 launchd-kit/testdata/grok-build-output-format-json-run.json	4962c621a34f13b12f295c3eedeaa2da167fb5d6
