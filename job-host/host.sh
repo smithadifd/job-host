@@ -72,8 +72,8 @@
 #                           stdout is the payload recorded. Default: a small
 #                           job-host event record (see jh_run_bounded).
 #   JH_TIMEOUT_SPOOL        spool file jh_run_bounded appends the timeout
-#                           payload to. Default:
-#                           $HOME/.claude/telemetry/job-host-events.jsonl —
+#                           payload to. See jh_run_bounded for the default
+#                           spool path —
 #                           deliberately NOT the run-record spool, so a
 #                           job-host event never reaches a run-record ingest.
 #   JH_NO_LK_ALIASES        set to 1 to skip the lib.sh-name wrappers.

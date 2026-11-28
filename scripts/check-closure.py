@@ -1,6 +1,6 @@
 #!/usr/bin/env python3
 # Matches absolute macOS/Linux/Windows user-home paths, tilde-home paths,
-# and the toolkit repository name as a path component (including GitHub URLs,
+# and a disallowed repository name as a path component (including GitHub URLs,
 # with or without a fragment, query or trailing punctuation). After the name,
 # a reference runs to the end of its token: a path, fragment or query tail
 # whole, any other tail less trailing sentence punctuation (. , ; : !), so an

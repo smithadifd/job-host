@@ -19,10 +19,12 @@ sourceable `launchd-kit/lib/{notify,telemetry,chain}.sh` integrations on top.
 
 ## Use
 
+Install as described in the [root README](../README.md#use).
+
 ```bash
 #!/bin/bash
 set -uo pipefail
-source "$HOME/claude-toolkit/job-host/host.sh"
+source "$JOB_HOST_ROOT/job-host/host.sh"
 
 TOOL_NAME=my-job
 jh_init                      # pin PATH, HOME and TZ, open $LOG

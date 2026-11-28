@@ -9,8 +9,9 @@ integration boundary.
 
 ## Use
 
-Run `bash install.sh DEST` to copy the two library folders to an absent
-installation directory. Source `DEST/job-host/host.sh` from a Bash job.
+Set `JOB_HOST_ROOT` to an absent installation directory, then run
+`bash install.sh "$JOB_HOST_ROOT"` to copy the two library folders there.
+Source `"$JOB_HOST_ROOT/job-host/host.sh"` from a Bash job.
 All vendored files deliberately retain mode 0644; invoke scripts through their
 interpreter. The example plist is data: edit its command and schedule before
 loading it yourself. Installation never loads a job or changes shell startup.

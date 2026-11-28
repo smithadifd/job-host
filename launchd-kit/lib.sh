@@ -1,7 +1,7 @@
 #!/usr/bin/env bash
 # launchd-kit/lib.sh — shared boilerplate for launchd scheduled-run wrappers.
 #
-# The $HOME/.claude/scripts/*-run.sh wrappers all re-implement the same five
+# Scheduled-run wrappers all re-implement the same five
 # concerns: pin the environment launchd doesn't give them, guard against
 # overlapping wake-ups, set up a rotating per-tool log, post to Discord, and
 # alert loudly if the run itself crashes. This library extracts those so a new
@@ -18,19 +18,19 @@
 #   TOOL_NAME              (required) short slug, e.g. "dependabot-sweep". Used
 #                          in the default LOG_DIR, log lines, and notify titles.
 #   LOG_DIR                (optional) log directory.
-#                          Default: $HOME/.claude/logs/$TOOL_NAME
+#                          See launchd_kit_init for the default.
 #   TZ                     (optional) timezone to pin. Default: America/New_York
 #   LAUNCHD_KIT_PATH       (optional) PATH to export for the minimal launchd env.
 #                          Default: $HOME/.local/bin:/opt/homebrew/bin:/usr/local/bin:/usr/bin:/bin:/usr/sbin:/sbin
 #                          ($HOME/.local/bin leads because the native Claude Code
 #                          installer puts `claude` there; see launchd_kit_init.)
 #   DISCORD_WEBHOOK_URL    (optional) resolved by the notify helper if unset —
-#                          see notify.json (scripts/notify-sink.md). NEVER logged.
+#                          see notify.json and discord-notify.md. NEVER logged.
 #   WEBHOOK_ENV_FILE       (optional, legacy) env file read as data, never sourced,
-#                          for DISCORD_WEBHOOK_URL. Default (in discord-notify.sh):
-#                          $HOME/.claude/secrets/dependabot-sweep.env
+#                          for DISCORD_WEBHOOK_URL. See discord-notify.sh
+#                          for its default.
 #   NOTIFY_SCRIPT          (optional) path to the shell discord-notify.sh.
-#                          Default: $HOME/.claude/scripts/discord-notify.sh
+#                          See lk_notify for the default.
 #   LOG_RETENTION_DAYS     (optional) delete *.log older than this. Default: 60
 #   LOG_MAX_FILES          (optional) secondary count cap for lk_rotate_logs,
 #                          applied after the age-based pass. Default: unset
@@ -124,7 +124,7 @@
 #   lk_emit_run [opts]          The wrapper's terminal emit (the ok path). Call once
 #                               as the LAST thing the wrapper does. Builds one
 #                               serotine.run.v1 JSONL line, appends it to the spool
-#                               ($HOME/.claude/telemetry/spool.jsonl), and best-effort
+#                               (spool.jsonl in SEROTINE_SPOOL_DIR), and best-effort
 #                               POSTs unsent spool lines. Opts (all optional):
 #                                 --status ok|fail|skip     (default ok)
 #                                 --exit-code N             (default 0)
@@ -151,7 +151,7 @@
 #     SEROTINE_JOB_LABEL         serotine.job.label. Default: com.$(id -un).$TOOL_NAME
 #     SEROTINE_HOST              host.name. Default: `hostname -s`
 #     SEROTINE_TRIGGER           default serotine.run.trigger. Default: launchd
-#     SEROTINE_SPOOL_DIR         spool directory. Default: $HOME/.claude/telemetry
+#     SEROTINE_SPOOL_DIR         spool directory. See lk_emit_run for the default.
 #     SEROTINE_INGEST_URL        push target. Push happens only if URL AND TOKEN set.
 #     SEROTINE_INGEST_TOKEN      Bearer token for the push (never logged).
 #     SEROTINE_INGEST_TIMEOUT    curl --max-time seconds for the push. Default: 5
@@ -160,10 +160,10 @@
 #                                line — see § failure forensics for the full
 #                                contract, the redaction posture, and the sibling
 #                                SEROTINE_FAILURE_* knobs. Unset is byte-identical
-#                                to the line this library emitted before BS8.
+#                                to the line this library emitted before failure forensics.
 #     SEROTINE_USAGE_FALLBACK_DISABLE=1   skip the session-JSONL usage fallback
 #                                       (set for known non-LLM heartbeat jobs).
-#     SEROTINE_USAGE_PROJECTS_DIR         session-JSONL root. Default: $HOME/.claude/projects
+#     SEROTINE_USAGE_PROJECTS_DIR         session-JSONL root; see serotine_usage.py.
 #     SEROTINE_USAGE_SESSION_ID           scope the usage scan to ONE session's transcript
 #                                       (<projects>/*/<session-id>.jsonl) so a concurrent
 #                                       session can't bleed its models/tokens into this job's
@@ -1009,7 +1009,7 @@ if [[ -f "$_LK_DIR/lib/telemetry.sh" ]]; then source "$_LK_DIR/lib/telemetry.sh"
 #|# invocations, tried in sequence, advancing to the next ONLY on a HARD
 #|# failure of the current one — never on output quality or content (this
 #|# function has no opinion on what a link said, only on whether it said
-#|# enough to exist). Per foundry standards/model-routing.md:296's carve-out,
+#|# enough to exist). To keep fallback deterministic,
 #|# this is a fixed, committed policy artifact (the chain and its order ARE
 #|# the policy, edited by commit), not a router or a quality-based selector.
 #|#
@@ -1244,8 +1244,8 @@ if [[ -f "$_LK_DIR/lib/telemetry.sh" ]]; then source "$_LK_DIR/lib/telemetry.sh"
 #|# serotine.run.v1 telemetry (opt-in)
 #|# ------------------------------------------------------------------------------
 #|# One JSONL line per run appended to a local spool, then best-effort POSTed to a
-#|# Fleet/Serotine ingest API. Normative contract: foundry roadmaps/fleet.md
-#|# § Schema (serotine.run.v1) + decisions/0009 (as amended: wire namespace serotine.*).
+#|# Fleet/Serotine ingest API.
+#|# The wire namespace is serotine.*.
 #|# The line shape is validated by telemetry/validate_serotine_run.py against
 #|# telemetry/serotine-run-v1.schema.json.
 #|#
@@ -1689,7 +1689,7 @@ if [[ -f "$_LK_DIR/lib/telemetry.sh" ]]; then source "$_LK_DIR/lib/telemetry.sh"
 #|# ingest dedupe key, so re-POSTing the same lines is safe by design. Never
 #|# retries within a run; short timeout; always returns 0.
 #|#
-#|# serotine.event.findings is SPOOL-ONLY (roadmaps/fleet-event-v1.md § Transport):
+#|# serotine.event.findings is SPOOL-ONLY:
 #|# the whole array is stripped from the POST body FAIL-CLOSED before it leaves the
 #|# machine — a body carrying the key is re-serialized without it, and any line
 #|# that cannot be stripped safely is dropped from the body rather than sent
@@ -1701,7 +1701,7 @@ if [[ -f "$_LK_DIR/lib/telemetry.sh" ]]; then source "$_LK_DIR/lib/telemetry.sh"
 #|# boundary, BEFORE it is used to slice a POST body. Sets $_LK_CURSOR_OFF to the
 #|# offset to use; returns non-zero only when it cannot establish a safe one.
 #|#
-#|# Why this exists (2026-09-10): the NY-110 cleanup removed two synthetic records
+#|# Why this exists: a cleanup removed two synthetic records
 #|# from the MIDDLE of the live spool and left the cursor alone. The cursor was
 #|# then 780 bytes past the end of the file. Every later push sliced from that
 #|# offset, so each body began mid-record (`rotine.schema": ...`), the collector
@@ -1985,7 +1985,7 @@ if [[ -f "$_LK_DIR/lib/telemetry.sh" ]]; then source "$_LK_DIR/lib/telemetry.sh"
 #|# lookup, still cannot park the wrapper), there is no retry within a run, and
 #|# the wrapper's exit code is untouched no matter what happens here. A first-tick
 #|# failure at launchd boot is expected and is not treated as fatal (the LAN-fetch
-#|# transient in foundry's Node-26/SSL_CERT_FILE note).
+#|# transient during certificate setup).
 #|#
 #|# BEST-EFFORT, NEVER SPOOLED. One attempt per run, no retry, nothing queued —
 #|# a run whose telemetry push failed (host offline) also loses its trace. That is

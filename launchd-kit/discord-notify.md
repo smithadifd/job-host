@@ -5,7 +5,7 @@ How scheduled jobs post to a chat webhook. [`discord-notify.sh`](./discord-notif
 Reference points:
 
 - **Shell and launchd jobs** — `launchd-kit/discord-notify.sh` is the canonical, version-controlled copy. A machine-local mirror may be what wrappers actually call, and it can lag the checkout. A caller that depends on a newer flag should verify the resolved script supports it: a stale copy silently swallows an unknown flag as a positional argument.
-- **Interpreter contract** — toolkit leaf programs are regular tracked `100644` files. Run this shell notifier with `bash <path>`, including from Python argv lists (`["bash", str(path), ...]`). `NOTIFY_SCRIPT` names one readable regular shell script, never a command string. No executable bit is needed; libraries are still sourced and Python modules imported normally.
+- **Interpreter contract** — leaf programs are regular tracked `100644` files. Run this shell notifier with `bash <path>`, including from Python argv lists (`["bash", str(path), ...]`). `NOTIFY_SCRIPT` names one readable regular shell script, never a command string. No executable bit is needed; libraries are still sourced and Python modules imported normally.
 - **Escalation** — pinging a human about a blocking ask is the caller's concern, not the notifier's. The notifier only delivers what it is given; a caller that needs a human now builds its own message and passes it with `--content` (see § Mentions).
 
 ## When to use what
@@ -23,7 +23,7 @@ Reference points:
 The script resolves the webhook URL in this order, first hit wins:
 
 1. `DISCORD_WEBHOOK_URL`, if already exported.
-2. The channel's `webhook` in `notify.json`, the one fixed configuration file (the channel `--channel <name>` names, else the one `NOTIFY_CHANNEL` names, else `default`). The schema and location are in [`scripts/notify-sink.md`](../scripts/notify-sink.md). A file that breaks the schema, or a missing channel, exits `2`.
+2. The channel's `webhook` in `notify.json`, the one fixed configuration file (the channel `--channel <name>` names, else the one `NOTIFY_CHANNEL` names, else `default`). See the [configuration location](README.md#env-var-contract). A file that breaks the schema, or a missing channel, exits `2`.
 3. Only while `notify.json` is absent, for one release: `DISCORD_WEBHOOK_URL` read as data from the env file named by `WEBHOOK_ENV_FILE`, else the script's default env file under the caller's secrets directory, with a deprecation line on standard error. The file is never sourced.
 
 If none resolves, it prints `discord-notify: no DISCORD_WEBHOOK_URL configured` and exits non-zero. It never sends to a hard-coded fallback and never silently no-ops. Implementations in other runtimes follow the same order: an explicit argument first, then the environment, then a secrets file, then (services only) a per-user override stored by the app.

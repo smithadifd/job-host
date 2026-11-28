@@ -18,7 +18,7 @@ _LK_CHAIN_SH_LOADED=1
 # invocations, tried in sequence, advancing to the next ONLY on a HARD
 # failure of the current one — never on output quality or content (this
 # function has no opinion on what a link said, only on whether it said
-# enough to exist). Per foundry standards/model-routing.md:296's carve-out,
+# enough to exist). To keep fallback deterministic,
 # this is a fixed, committed policy artifact (the chain and its order ARE
 # the policy, edited by commit), not a router or a quality-based selector.
 #
