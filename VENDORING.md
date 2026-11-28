@@ -8,10 +8,15 @@ bytes, not the source commit's blobs. A re-carve must preserve these edits.
 The pins file's two header lines are fixed parser syntax retained for compatibility.
 
 - `job-host/README.md`
+- `job-host/host.sh`
 - `job-host/tests/test_lock.py`
 - `launchd-kit/README.md`
+- `launchd-kit/discord-notify.md`
 - `launchd-kit/discord-notify.sh`
+- `launchd-kit/install-op-resolve.sh`
 - `launchd-kit/lib.sh`
+- `launchd-kit/lib/chain.sh`
+- `launchd-kit/lib/telemetry.sh`
 - `launchd-kit/serotine_usage.py`
 - `launchd-kit/telemetry/serotine-run-v1.schema.json`
 - `launchd-kit/telemetry/serotine_spool.py`

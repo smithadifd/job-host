@@ -26,7 +26,7 @@ the script rather than in the plist. Secrets and operator home paths do not
 belong in the plist environment.
 
 [`scripts/unattended/seat-launcher.sh`](../scripts/unattended/seat-launcher.sh)
-is that protected launcher (CX15): it pins the env vars this LaunchDaemon
+is that protected launcher: it pins the env vars this LaunchDaemon
 shape does not supply (`USER`/`LOGNAME`, alongside the plist's own
 `HOME`/`TMPDIR`/`PATH`), refuses fail-closed unless both the layer-1
 dead-man evidence and the harness's confinement evidence are fresh
@@ -46,7 +46,7 @@ exception for a worktree below `__EXCLUDE_ROOT__`.
 Creating the account, directories, ACLs, rendered plist, or LaunchDaemon is a
 supervised owner action; this source-only template performs none of them.
 
-Every `$HOME/.claude/scripts/*-run.sh` wrapper on the Host-a re-implemented the same
+Existing scheduled-run wrappers re-implemented the same
 five concerns by hand: pin the minimal environment launchd hands a job, guard
 against overlapping wake-ups, set up a rotating per-tool log, post to Discord,
 and shout if the run itself crashed. `lib.sh` extracts those so a new automation
@@ -64,7 +64,7 @@ hygiene, truncation) documented in [`discord-notify.md`](./discord-notify.md).
 This kit does **not** re-implement it. The canonical, version-controlled copy now
 lives here at [`launchd-kit/discord-notify.sh`](./discord-notify.sh) (see
 [The Discord notifier](#the-discord-notifier) below); the machine-local
-`$HOME/.claude/scripts/discord-notify.sh` mirrors it. `lk_notify` runs
+copy selected by `NOTIFY_SCRIPT` mirrors it. `lk_notify` runs
 `bash "$NOTIFY_SCRIPT"` (default: the machine-local copy). `NOTIFY_SCRIPT`
 is one readable regular shell-script pathname, not a command string; an
 executable bit is not required. Missing, unreadable or non-regular targets skip
@@ -85,20 +85,20 @@ briefs should always set the applicable variable.
 
 [`merge-tick-run.sh`](./merge-tick-run.sh) runs the four-hour merge decision
 check with a Connect credential and writes `decisions.jsonl` under
-`$HOME/.claude/logs/merge-tick/`. Its [plist template](./templates/)
+the job's configured log directory. Its [plist template](./templates/)
 ships in dry-run mode; `MERGE_TICK_APPLY=1` enables applying eligible decisions.
 Before loading the template, create its launchd output directory with
-`mkdir -p "$HOME/.claude/logs/merge-tick"`; launchd opens the output paths before the
+`mkdir -p "<rendered-output-directory>"`; launchd opens the output paths before the
 wrapper can create its log directory.
 
 [`hands-on-digest-run.sh`](./hands-on-digest-run.sh) runs once successfully per
 day inside `DIGEST_SLOT_START`–`DIGEST_SLOT_END` (default 09:00–09:59 Eastern),
-logging under `$HOME/.claude/logs/hands-on-digest/`. Its
+logging under the job's configured log directory. Its
 [plist template](./templates/) ships in dry-run
 mode; `HANDS_ON_DIGEST_SEND=1` enables Discord delivery. Failed runs leave the
 slot open for a later tick within the window.
 Before loading the template, create its launchd output directory with
-`mkdir -p "$HOME/.claude/logs/hands-on-digest"`; launchd opens the output paths before
+`mkdir -p "<rendered-output-directory>"`; launchd opens the output paths before
 the wrapper can create its log directory. A successful dry-run also claims the
 day's slot, so enabling `HANDS_ON_DIGEST_SEND=1` later that day waits until the
 next day's window.
@@ -111,8 +111,8 @@ unreadable input, a crash or a 120 second timeout) never changes the wrapper's
 exit status or the slot claim. Without the ledger variable the check is skipped.
 
 [`ledger-export-run.sh`](./ledger-export-run.sh) runs hourly and keeps the state
-ledger's private export repository current. Each tick runs `scripts/ledger
-export --commit`, then `export --push`, then `export --check` (lag limits
+ledger's export repository current. Each tick runs the ledger CLI's
+`export --commit`, then `export --push`, then `export --check` (lag limits
 `LEDGER_EXPORT_MAX_EVENTS`, default 100, and `LEDGER_EXPORT_MAX_HOURS`, default
 24). After those steps succeed, a private weekly slot restores the export into
 a `mktemp -d` database, verifies its chain and SQLite integrity, and compares
@@ -142,8 +142,8 @@ from CLI or git output: only the step, its exit code, a fixed category
 --rebase`); the job never rebases, forces or rewrites the export history
 itself. Its
 [plist template](./templates/) logs under
-`$HOME/.claude/logs/ledger-export/`; create that directory with
-`mkdir -p "$HOME/.claude/logs/ledger-export"` before loading the template.
+the job's configured log directory; create the directory named in the rendered
+plist before loading the template.
 
 [`disk-guard-run.sh`](./disk-guard-run.sh) runs every 15 minutes and keeps
 Time Machine local snapshots from holding the data volume's real free space.
@@ -167,8 +167,8 @@ run (exit 2). A df or tmutil failure exits 1 and sends one plain ping (inside
 the same 6-hour limit) only when free was already below 30 GiB, so a broken
 tool never pings every tick from a healthy disk. Its
 [plist template](./templates/) logs under
-`$HOME/.claude/logs/disk-guard/`; create that directory with
-`mkdir -p "$HOME/.claude/logs/disk-guard"` before loading the template.
+the job's configured log directory; create the directory named in the rendered
+plist before loading the template.
 
 ## Root-delivery check
 
@@ -179,7 +179,7 @@ the job inherits the manager environment), and the last wrapper-log line
 carrying the root. Check (4) needs the named job's wrapper to log a
 `HARNESS_ROOT=` line; `lib.sh`'s `lk_log` does not emit one by itself.
 Wrapper logs are the files `launchd_kit_init` opens under
-`$HOME/.claude/logs/<last-component-of-job-label>/`.
+`$LOG_DIR`.
 
 ```sh
 launchd-kit/check-harness-root.sh /absolute/expected/root com.example.job-label
@@ -201,10 +201,10 @@ Set these **before** calling `launchd_kit_init`:
 | Var | Required | Default | Purpose |
 |---|---|---|---|
 | `TOOL_NAME` | **yes** | — | Short slug (e.g. `dependabot-sweep`). Drives the default `LOG_DIR`, log lines, notify titles, and the `<TOOL>_FORCE` override. |
-| `LOG_DIR` | no | `$HOME/.claude/logs/$TOOL_NAME` | Where run logs, the slot marker, and the lock live. |
+| `LOG_DIR` | no | See `launchd_kit_init` | Where run logs, the slot marker, and the lock live; set explicitly for a custom installation. |
 | `TZ` | no | `America/New_York` | Timezone to pin so scheduled windows are stable. |
 | `LAUNCHD_KIT_PATH` | no | `$HOME/.local/bin:/opt/homebrew/bin:/usr/local/bin:/usr/bin:/bin:/usr/sbin:/sbin` | `PATH` to export for the minimal launchd env. `$HOME/.local/bin` leads because the native Claude Code installer puts `claude` there; the Homebrew cask that used to supply `/opt/homebrew/bin/claude` is gone. Homebrew stays on the path for `gh`/`jq`/`git`. (`HOME` is pinned before `PATH` precisely so this default can interpolate it.) |
-| `NOTIFY_SCRIPT` | no | `$HOME/.claude/scripts/discord-notify.sh` | The shell notifier `lk_notify` shells out to. |
+| `NOTIFY_SCRIPT` | no | Machine-local notifier mirror | The shell notifier `lk_notify` shells out to; set explicitly to use the installed copy. |
 | `LK_NOTIFY_TIMEOUT_SECS` | no | `300` | Hard bound on the `lk_notify` notifier call (via `_lk_timeout`). Deliberately generous: the stock notifier's worst *legitimate* path — Connect (3 lookups × 2 attempts × 10s = 60s) → `op read` (2 × 90s + 2s = 182s) → `curl` (20s) — is **~262s** (~272s counting the two 5s kill-after graces), and a bound under that ceiling silently drops real posts instead of preventing a wedge. **Headroom is thin (~28s)**: if any leg grows, raise this first. |
 | `DISCORD_WEBHOOK_URL` | no | — | Resolved by the notifier if unset: from the `default` channel (or the one `--channel <name>` or `NOTIFY_CHANNEL` names) of `notify.json`, the one fixed configuration file in the toolkit configuration folder (`$XDG_CONFIG_HOME/claude-toolkit/` when absolute, else `$HOME/.config/claude-toolkit/`; schema in [`scripts/notify-sink.md`](../scripts/notify-sink.md)). **Never logged.** |
 | `NOTIFY_CHANNEL` | no | `default` | The `notify.json` channel the notifier posts to when no `--channel` flag is given. `lk_notify` passes no flags, so a wrapper picks its channel by exporting this. Letters, digits, `.`, `_` and `-` only; any other value makes the notifier exit `2`. |
@@ -266,7 +266,7 @@ records inside the run's time window (disable per-job with
 `SEROTINE_USAGE_FALLBACK_DISABLE=1` for known non-LLM jobs). Tokens only; dollars
 are derived at ingest, never in the emitter.
 
-**Transport:** one line is appended to `$HOME/.claude/telemetry/spool.jsonl`;
+**Transport:** one line is appended to `spool.jsonl` in `$SEROTINE_SPOOL_DIR`;
 unsent lines (tracked by a byte-offset cursor next to the spool) are best-effort
 POSTed to `$SEROTINE_INGEST_URL` with `$SEROTINE_INGEST_TOKEN` **only if both are
 set**. A 2xx advances the cursor; otherwise the batch is retried next run.
@@ -289,12 +289,12 @@ Telemetry env-var contract (all optional; read at emit time):
 | `SEROTINE_JOB_LABEL` | `com.$(id -un).$TOOL_NAME` | `serotine.job.label` (the launchd label). |
 | `SEROTINE_HOST` | `hostname -s` | `host.name`. |
 | `SEROTINE_TRIGGER` | `launchd` | Default `serotine.run.trigger`. |
-| `SEROTINE_SPOOL_DIR` | `$HOME/.claude/telemetry` | Spool + cursor directory. |
+| `SEROTINE_SPOOL_DIR` | See `lk_emit_run` | Spool + cursor directory; set explicitly for a custom installation. |
 | `SEROTINE_INGEST_URL` | — | Push target. Push happens only if URL **and** token are set. |
 | `SEROTINE_INGEST_TOKEN` | — | Bearer token for the push. **Never logged.** |
 | `SEROTINE_INGEST_TIMEOUT` | `5` | `curl --max-time` seconds for the push. |
 | `SEROTINE_USAGE_FALLBACK_DISABLE` | `0` | `1` skips the session-JSONL usage fallback. |
-| `SEROTINE_USAGE_PROJECTS_DIR` | `$HOME/.claude/projects` | Session-JSONL root for the fallback. |
+| `SEROTINE_USAGE_PROJECTS_DIR` | See `serotine_usage.py` | Session-JSONL root for the fallback; set explicitly for a custom installation. |
 | `SEROTINE_USAGE_SESSION_ID` | — | Scope the usage scan to one session's transcript (`<projects>/*/<id>.jsonl`) so a concurrent session can't bleed into this job's rollup / model-drift. Unset = whole-tree window walk. Pass the **same** id to `claude -p --session-id`. |
 | `SEROTINE_USAGE_PROVIDER` | — | **Opt-in, non-Claude jobs**: `codex`\|`gemini`\|`omp`\|`grok-build` selects the matching provider usage adapter. **Precedence: this path is checked FIRST**, before `--usage-json`/`--usage-file` and the window fallback, and it never falls through to either. Unset = byte-identical to today (purely additive). An unrecognized value is a **hard error** (raises) rather than a silent `[]` or a silent Claude-window scan. |
 | `SEROTINE_USAGE_INPUT` | — | File path holding the `SEROTINE_USAGE_PROVIDER` provider's raw output. **Codex: the session ROLLOUT file** (`$HOME/.codex/sessions/**/*.jsonl`) — the only codex-side input that carries a served model id. Raw `codex exec --json` **STDOUT is NOT valid input**: it never carries a model id and is detected + rejected with a loud, actionable `CodexStdoutWireShapeError` (fix the wiring: point this at the rollout file) rather than silently emitting a model-less usage row. Loud at the helper boundary: invoking `serotine_usage.py` directly fails non-zero with the message; under `lk_emit_run` the wrapper is (by design) never failed by telemetry — the observable symptom of a miswired job is that its usage line is simply not emitted, so run the helper directly to see the error. Gemini: a raw API response JSON body. **Omp: the `omp -p --mode json` event stream** (JSONL — the terminal `agent_end` event carries the whole `messages[]`, one usage entry per distinct `(provider, model)`). **Grok-build: the Grok Build CLI's `--output-format json` result object** (ONE JSON object — its `modelUsage` *keys* are the SERVED model ids, e.g. `grok-4.6-build` for a run that requested `grok-4.6`). For those two a capture of the client's **human-readable TUI transcript is NOT valid input** either: it is detected + rejected with a loud, actionable `TuiOutputWireShapeError` naming the flag to add, with the same "no usage line emitted" symptom under `lk_emit_run`. Required alongside `SEROTINE_USAGE_PROVIDER`; missing/unreadable → `[]` (fail closed). |
@@ -360,7 +360,7 @@ is exactly why enabling is per job and starts with reading that job's own log.
 | `SEROTINE_TRACE_LOG` | `$LOG` | Log file to capture. |
 | `SEROTINE_TRACE_LINES` | `200` | Last-N log lines to send. |
 | `SEROTINE_TRACE_UPLOAD_MAX_BYTES` | `262144` | Body cap **after** redaction, trimmed oldest-first. Named apart from serotine's server-side `SEROTINE_TRACE_MAX_BYTES` on purpose. |
-| `SEROTINE_TRACE_TIMEOUT` | `10` | `curl --max-time` seconds (the `_lk_timeout` bound is this + 5). Must be a **positive** integer — `0` means "no timeout" to the underlying tools, so it takes the default (tightened in BS8 alongside the forensics lane's identical validation). |
+| `SEROTINE_TRACE_TIMEOUT` | `10` | `curl --max-time` seconds (the `_lk_timeout` bound is this + 5). Must be a **positive** integer — `0` means "no timeout" to the underlying tools, so it takes the default, matching the forensics lane's validation. |
 | `SEROTINE_TRACE_REDACT_ENV` | — | Extra env var **names** whose values to redact. |
 | `SEROTINE_TRACE_REDACT_PATTERN` | — | Extra job-specific redaction regex. An unusable regex fails closed. |
 
@@ -378,13 +378,13 @@ The payload is raw NDJSON — one provenance header line
 capture counts and the redaction count) followed by one `{"type":"log",…}` line
 per captured log line. serotine stores it verbatim and parses nothing.
 
-#### Failure forensics on the run line — opt-in, **OFF fleet-wide** (BS8)
+#### Failure forensics on the run line — opt-in, **OFF fleet-wide**
 
 The other half of the same finding, and the more visible one. serotine's
 `serotine.run.v1` wire has carried an optional `serotine.run.failure` object
-(`message` / `last_log_line` / `stderr_tail`) since BC4, `/jobs/<label>` renders
-it beneath the run it belongs to, and BH2 quotes an excerpt in the weekly Discord
-digest. All of it has rendered **empty on every real run**, because nothing on
+(`message` / `last_log_line` / `stderr_tail`), `/jobs/<label>` renders
+it beneath the run it belongs to, and the weekly Discord digest quotes an excerpt.
+All of it has rendered **empty on every real run**, because nothing on
 the wrapper side populated the field — serotine's own `AGENTS.md` says so:
 *"NOT BUILT HERE: the emitter itself (launchd-kit `lib.sh`)"*. `lib.sh` now can.
 
@@ -398,7 +398,7 @@ the default everywhere — the collector returns on its first line (no subproces
 no file read) and the emitted line is **byte-for-byte the line `lib.sh` emitted
 before this feature existed**. That equivalence is the point of `test-lib.sh`
 § (z1)–(z3), which assert the exact nine-key line and pass against the
-pre-BS8 library unchanged.
+library without this feature unchanged.
 
 ```bash
 export SEROTINE_EMIT_FAILURE=fail     # `always` also annotates ok/skip runs
@@ -422,7 +422,7 @@ strip later would protect future lines only. So the object is built by the same
 uses (`build-failure`), reusing `SEROTINE_TRACE_REDACT_ENV` /
 `SEROTINE_TRACE_REDACT_PATTERN`, and it is **fail-closed**: no redactor on disk,
 no python3, or an unusable pattern means *nothing is attached*. Read that
-module's REDACTION header before enabling a job. Note also that BH2 puts an
+module's REDACTION header before enabling a job. Note also that the digest puts an
 excerpt in a **Discord** embed — off-host and unauthenticated, by election.
 
 | Var | Default | Purpose |
@@ -543,7 +543,7 @@ boilerplate is now four function calls:
 set -uo pipefail
 
 export TOOL_NAME="my-sweep"
-source "$HOME/claude-toolkit/launchd-kit/lib.sh"
+source "$JOB_HOST_ROOT/launchd-kit/lib.sh"
 
 launchd_kit_init                 # pin env, open $LOG
 lk_enable_crash_alert            # red Discord ping on non-zero exit
@@ -573,7 +573,7 @@ red "run failed" embed automatically — you don't wire that per-branch.
 
 ## Retrofit guide (migrating an existing wrapper)
 
-The live `$HOME/.claude/scripts/*-run.sh` wrappers run on schedule and are not yet
+The live scheduled-run wrappers run on schedule and are not yet
 version-controlled — **do not hot-edit them.** Retrofit is a deliberate,
 separate step (pairs with the `new-project` / new-automation skill). When you do
 migrate one, this is the mechanical mapping:
@@ -628,7 +628,7 @@ Behavioral parity notes when retrofitting:
 ## The Discord notifier
 
 [`discord-notify.sh`](./discord-notify.sh) is the version-controlled copy of the
-machine-local `$HOME/.claude/scripts/discord-notify.sh` — the single point every
+machine-local notifier mirror — the single point every
 scheduled job's notify path runs through. The contract is
 [`discord-notify.md`](./discord-notify.md); this file must stay faithful to it.
 
@@ -676,8 +676,8 @@ bash launchd-kit/discord-notify.sh --content '<@123456789012345678> **NEEDS EXAM
 1. `$DISCORD_WEBHOOK_URL` if already exported.
 2. The channel's `webhook` in `notify.json` (the channel `--channel <name>`
    names, else `$NOTIFY_CHANNEL`, else `default`). A file that breaks the
-   schema, or a missing channel, exits `2`. Schema:
-   [`scripts/notify-sink.md`](../scripts/notify-sink.md).
+   schema, or a missing channel, exits `2`. See the notifier's configuration
+   location in the [env-var contract](#env-var-contract).
 3. Only while `notify.json` is absent, for one release: the env file at
    `$WEBHOOK_ENV_FILE`, else the legacy env file in the owner's secrets folder, parsed
    as data (never sourced; only `DISCORD_WEBHOOK_URL` is read), with a
@@ -779,7 +779,7 @@ limit; callers should close the pipe after writing. The whole call has a
 1. `$NOTIFY_OWNER_WEBHOOK_URL` (tests / overrides).
 2. `channels.owner.webhook` (and the optional `channels.owner.mention`) in
    `notify.json` — normally an `op://` reference resolved downstream by
-   `discord-notify.sh`. Schema: [`scripts/notify-sink.md`](../scripts/notify-sink.md).
+   `discord-notify.sh`. See the [env-var contract](#env-var-contract) for its configuration location.
 3. Only while `notify.json` is absent, for one release: `DISCORD_WEBHOOK_URL`
    and `OWNER_DISCORD_ID` (or the legacy owner-id key) from
    `$NOTIFY_OWNER_ENV_FILE` (default: the unchanged legacy owner env file
@@ -843,7 +843,7 @@ is worse than a loud failure. `discord-notify.sh` already bounds curl (10s
 connect / 20s total) and the `op` read.
 
 Notifier resolution checks `$NOTIFY_SCRIPT`, this script's sibling, then
-`$HOME/.claude/scripts/`, then `$HOME/claude-toolkit/launchd-kit/` — and **verifies each
+the legacy script locations built into that caller — and **verifies each
 candidate supports `--content`** before using it. A stale machine-local mirror
 would otherwise swallow the flag as a positional title and send a
 silently-muted escalation; if no candidate supports it, the script refuses
@@ -953,7 +953,7 @@ name alone only refuses a symlinked leaf, not a symlinked parent.
   — a watcher that wins the CAS a moment before the boundary cannot go on to
   run, or keep running, past it.
 
-### State layout (`$LK_CONTINUATION_DIR`, default `$HOME/.claude/continuations`)
+### State layout (`$LK_CONTINUATION_DIR`)
 
 ```
 registrations/<ask-id>.json   written once by the pitching session, never rewritten
@@ -1003,7 +1003,7 @@ the state constraint 2's message-id cross-check is validated against:
 
 ```bash
 # the pitching session, before it closes
-continuation.py register --ask-id "$ASK" --row-key BQ2 --repo owner/repo \
+continuation.py register --ask-id "$ASK" --row-key example-job --repo owner/repo \
   --cwd "$PWD" --session-id "$SESSION" --expires-at 2026-08-31T09:00:00Z \
   --verb spec-draft --verb re-pitch --model claude-sonnet-5-5
 
@@ -1013,7 +1013,7 @@ continuation.py consume --ask-id "$ASK" --consumer session
 continuation.py state  --ask-id "$ASK"
 
 # the kickoff lane (close-time continuity across a wave boundary)
-continuation.py kickoff --ask-id "$ASK" ... --kickoff-type ROLL --harness omp
+continuation.py kickoff --ask-id "$ASK" ... --kickoff-type <supported-type> --harness omp
 continuation.py ready       --ask-id "$ASK"   # armed/ -> ready/
 continuation.py claim-ready --newest          # ready/ -> claimed/, prints the argv
 ```
@@ -1024,11 +1024,11 @@ and prints one JSON object — `askId`, `harness`, `cwd`, `claimedPath`, `argv`
 execs it is `loop-chain-run.sh --exec`, which is itself gated on
 `LOOP_CHAIN_EXEC=1` (both gates required; with the variable unset that wrapper
 behaves exactly as it did before the exec path existed). A record it refuses
-(SWEEP, CHART/MERGE, expired, malformed) is left in `ready/` unspent, because
+(unsupported kickoff type, expired, malformed) is left in `ready/` unspent, because
 the refusal happens before the claim.
 
 The scheduled caller of that exec path is the daily queue-generation job:
-`triage-wave-run.sh --wave` creates the queue, publishes its ROLL kickoff READY
+`triage-wave-run.sh --wave` creates the queue, publishes its execution kickoff READY
 and, as its step 4, runs `loop-chain-run.sh --exec` — inheriting the same
 double gate, so without `LOOP_CHAIN_EXEC=1` the slot stops at READY and its
 log says why. `triage-wave-run.sh --triage-only` is the 4h timer's shape
@@ -1117,8 +1117,8 @@ pinned by tests: every element between the binary and the prompt starts with
 The builder never emits a permission-elevating flag (`FORBIDDEN_ARGV_FLAGS`,
 scanned over the built argv, not merely tested), and passes `--disallowedTools`
 for the classes § 3.5 keeps on the trust ladder (merge, `gh pr merge`,
-`launchctl`, `op`, `security`) — branch pushes are permitted (NY-123, elected
-2026-09-11). The deny list is defense in depth; the **gate** is the
+`launchctl`, `op`, `security`) — branch pushes are permitted.
+The deny list is defense in depth; the **gate** is the
 registration's verb allowlist, checked before an argv exists.
 
 ### Exactly-once, both paths
@@ -1156,7 +1156,7 @@ repitches/<ask-id>.<hash>.json    what text earned: the same election, again
 
 ```bash
 # the pitching session, alongside `continuation.py register`
-elicitation.py declare --ask-id "$ASK" --row-key BS11 --from-file tree.json
+elicitation.py declare --ask-id "$ASK" --row-key example-job --from-file tree.json
 
 # see exactly what a tap would run, without running it
 elicitation.py argv --ask-id "$ASK" --option-key now
@@ -1296,7 +1296,7 @@ when present, otherwise the resolver falls back to the macOS Keychain item
 ### Usage
 
 ```bash
-op-resolve.py --env-file "$HOME/.claude/secrets/<job>.env" -- <cmd> [args...]
+op-resolve.py --env-file "/etc/jobs/example.env" -- <cmd> [args...]
 ```
 
 It reads a dotenv-style env file (`KEY=value`; `#` comments and blank lines
@@ -1337,14 +1337,14 @@ valid when this repo is moved, renamed, or simply not there. That stable path is
 the **mirror**:
 
 ```
-$HOME/.claude/scripts/op-resolve.py
+$OP_RESOLVE_PY
 ```
 
 One lookup order, used everywhere:
 
 1. `$OP_RESOLVE_PY`, when it is set and names an existing file — the override
    that every test suite uses to point at a stub;
-2. the mirror at `$HOME/.claude/scripts/op-resolve.py`;
+2. the machine-local mirror installed by `install-op-resolve.sh`;
 3. the checkout's own `launchd-kit/op-resolve.py`, for consumers that are
    *already* running from inside a checkout.
 
@@ -1354,9 +1354,8 @@ from paths that are not a checkout, and its own last resort is the legacy
 `op read` fallback rather than a repo copy. `review`'s `jev_client.py` is the
 one consumer that does not use this order at all: it *imports* `resolve_ref()`
 in-process rather than exec'ing the resolver, from `launchd-kit/op-resolve.py`
-two directories above its own file. `review` now comes from the pinned skills
-upstream (`skills-upstream.pin`; the file is
-`.skills-upstream/skills/review/jev_client.py` in the toolkit checkout), and
+two directories above its own file. When the review client comes from a separate
+skills checkout,
 that repository ships no `launchd-kit/`, so from there the import finds
 nothing and the Jev path reports itself unavailable rather than loading this
 checkout's resolver. Restoring it needs a lookup seam in the upstream
@@ -1389,7 +1388,7 @@ The drift report is always emitted **before** anything is written, so a
 replacement can never be discovered after the fact; with `--force` the drifted
 copy is preserved as `op-resolve.py.drift-<UTC timestamp>` beside the mirror
 before the canonical bytes are staged atomically over it. `--check` writes
-nothing under any circumstances — not even the `$HOME/.claude/scripts` directory.
+nothing under any circumstances — not even the mirror's parent directory.
 
 Applying it to a real machine is a **supervised** step, like every other change
 in this section: run `--check` first, read the report, and only then
@@ -1430,7 +1429,7 @@ token), filters to the AI Coding Tasks data source
 (`data.parent.data_source_id`), filters `page.properties_updated` to the
 watched **property ids** (Lane / AI Label / Type — Notion sends ids, not
 names), drops all-bot-authored events (the loop's own writes), and on a match
-atomically writes `$HOME/.claude/triage-wave/kick/kickstart.json`. A `WatchPaths`
+atomically writes the configured kickstart marker. A `WatchPaths`
 job on that directory (the `herald-watch-run.sh` pattern; the wrapper is
 next wave's) is what would run `launchctl kickstart` on
 the triage-wave job. The receiver itself never calls `launchctl`, never
@@ -1458,7 +1457,7 @@ python3 launchd-kit/notion-webhook-receiver.py check --config launchd-kit/notion
 python3 launchd-kit/notion-webhook-receiver.py serve --config <cfg> --handshake
 
 # normal service, under the resolver (a plist's ProgramArguments, next wave):
-python3 launchd-kit/op-resolve.py --env-file "$HOME/.claude/secrets/notion-webhook.env" -- \
+python3 launchd-kit/op-resolve.py --env-file "/etc/jobs/notion-webhook.env" -- \
   python3 launchd-kit/notion-webhook-receiver.py serve --config <cfg>   # 127.0.0.1:8791
 ```
 

@@ -6,7 +6,7 @@
 # being moved, renamed or absent — a launchd job's ProgramArguments cannot
 # depend on where someone happens to have cloned this repo. That stable path is
 #
-#     $HOME/.claude/scripts/op-resolve.py            (the "mirror")
+#     the mirror target selected below (override with --target)
 #
 # and this script is the ONLY thing that is allowed to write it. Everything
 # else reads it. Keeping one writer is the whole point: a mirror refreshed by
@@ -31,8 +31,8 @@
 #
 #   --source PATH        Override the canonical source (default: op-resolve.py
 #                        beside this script).
-#   --target PATH        Override the mirror (default:
-#                        $HOME/.claude/scripts/op-resolve.py).
+#   --target PATH        Override the mirror (see TARGET below
+#                        for its default).
 #
 # What "in sync" means here is byte identity, not "close enough": the staged
 # mirror is compared to the canonical source with cmp(1), and the reports carry

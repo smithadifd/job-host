@@ -1754,7 +1754,7 @@ class ChainRequestModelTests(unittest.TestCase):
         # contract extends to the served-provider selector, not only to
         # whether the chain runs). SEROTINE_USAGE_PROJECTS_DIR is pointed at
         # an empty dir so the window scan can't pick up this MACHINE's real
-        # $HOME/.claude/projects transcripts and make the assertion below
+        # session transcripts and make the assertion below
         # environment-dependent.
         with scrubbed_env(SEROTINE_USAGE_PROJECTS_DIR=self._tmp.name):
             entries = su.resolve_usage()
@@ -1780,7 +1780,7 @@ class ChainRequestModelTests(unittest.TestCase):
                           SEROTINE_USAGE_REQUEST_MODEL="gpt-5.6-sol"):
             codex_entries = su.resolve_usage()
         # the "claude served, provider left unset" lane — isolated from this
-        # machine's real $HOME/.claude/projects, same reasoning as the test above
+        # machine's real session transcripts, same reasoning as the test above
         with scrubbed_env(SEROTINE_USAGE_PROJECTS_DIR=self._tmp.name):
             claude_entries = su.resolve_usage()
         self.assertEqual(codex_entries[0]["gen_ai.provider.name"], "openai")

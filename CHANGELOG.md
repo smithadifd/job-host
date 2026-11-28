@@ -2,6 +2,9 @@
 
 ## Unreleased
 
+- Replace checkout-specific documentation and comment references with install
+  roots, configuration variables and direct explanations. Runtime defaults
+  and executable code are unchanged.
 - Keep the lock-contention test's winner running until every loser exits.
   A delayed contender can no longer outlast a fixed sleep and appear to
   violate mutual exclusion through a legitimate later acquisition.

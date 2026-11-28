@@ -23,8 +23,8 @@ _LK_TELEMETRY_ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")" && { [[ "${BASH_SOURCE
 # serotine.run.v1 telemetry (opt-in)
 # ------------------------------------------------------------------------------
 # One JSONL line per run appended to a local spool, then best-effort POSTed to a
-# Fleet/Serotine ingest API. Normative contract: foundry roadmaps/fleet.md
-# § Schema (serotine.run.v1) + decisions/0009 (as amended: wire namespace serotine.*).
+# Fleet/Serotine ingest API.
+# The wire namespace is serotine.*.
 # The line shape is validated by telemetry/validate_serotine_run.py against
 # telemetry/serotine-run-v1.schema.json.
 #
@@ -468,7 +468,7 @@ _lk_emit_run_core() {
 # ingest dedupe key, so re-POSTing the same lines is safe by design. Never
 # retries within a run; short timeout; always returns 0.
 #
-# serotine.event.findings is SPOOL-ONLY (roadmaps/fleet-event-v1.md § Transport):
+# serotine.event.findings is SPOOL-ONLY:
 # the whole array is stripped from the POST body FAIL-CLOSED before it leaves the
 # machine — a body carrying the key is re-serialized without it, and any line
 # that cannot be stripped safely is dropped from the body rather than sent
@@ -480,7 +480,7 @@ _lk_emit_run_core() {
 # boundary, BEFORE it is used to slice a POST body. Sets $_LK_CURSOR_OFF to the
 # offset to use; returns non-zero only when it cannot establish a safe one.
 #
-# Why this exists (2026-09-10): the NY-110 cleanup removed two synthetic records
+# Why this exists: a cleanup removed two synthetic records
 # from the MIDDLE of the live spool and left the cursor alone. The cursor was
 # then 780 bytes past the end of the file. Every later push sliced from that
 # offset, so each body began mid-record (`rotine.schema": ...`), the collector
@@ -764,7 +764,7 @@ _lk_collect_failure() {
 # lookup, still cannot park the wrapper), there is no retry within a run, and
 # the wrapper's exit code is untouched no matter what happens here. A first-tick
 # failure at launchd boot is expected and is not treated as fatal (the LAN-fetch
-# transient in foundry's Node-26/SSL_CERT_FILE note).
+# transient during certificate setup).
 #
 # BEST-EFFORT, NEVER SPOOLED. One attempt per run, no retry, nothing queued —
 # a run whose telemetry push failed (host offline) also loses its trace. That is
